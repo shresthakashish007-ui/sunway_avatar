@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Test - Female Voice Selection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #B51F24;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #8F171B;
+        }
+        .voice-list {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .voice-item {
+            padding: 5px;
+            margin: 3px 0;
+            background: #f9f9f9;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .selected {
+            background: #e8f5e9;
+            font-weight: bold;
+        }
+        h1 { color: #B51F24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Female Voice Test</h1>
+        <p>Test the browser's female voice selection for the avatar.</p>
+        
+        <button onclick="testVoice()">🔊 Test Female Voice</button>
+        <button onclick="listVoices()">📋 Show All Voices</button>
+        
+        <div id="status" style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px;"></div>
+        <div id="voiceList" class="voice-list"></div>
+    </div>
+
+    <script>
+        function updateStatus(msg, color = '#333') {
+            document.getElementById('status').innerHTML = `<strong style="color: ${color}">${msg}</strong>`;
+        }
+
+        function testVoice() {
+            if (!window.speechSynthesis) {
+                updateStatus('❌ Speech synthesis not supported in this browser!', '#d32f2f');
+                return;
+            }
+
+            const text = "Namaste! Welcome to Sunway College Kathmandu. I am your AI admission assistant. How can I help you today?";
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1;
+            utterance.volume = 1;
+
+            const voices = window.speechSynthesis.getVoices();
+            
+            // Find best female voice (same logic as ttsService.js)
+            let selectedVoice = voices.find(v => v.name.includes('Zira')) ||
+                               voices.find(v => v.name.includes('Google') && v.name.includes('Female')) ||
+                               voices.find(v => v.name.toLowerCase().includes('female')) ||
+                               voices.find(v => ['Samantha', 'Victoria', 'Karen', 'Susan'].some(name => v.name.includes(name))) ||
+                               voices[0];
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+                updateStatus(`🎤 Playing with: ${selectedVoice.name} (${selectedVoice.lang})`, '#1b5e20');
+            } else {
+                updateStatus('⚠️ Using default voice', '#f57c00');
+            }
+
+            utterance.onstart = () => console.log('Speech started');
+            utterance.onend = () => {
+                updateStatus(`✅ Speech completed! Voice used: ${selectedVoice ? selectedVoice.name : 'Default'}`, '#1b5e20');
+            };
+            utterance.onerror = (e) => {
+                updateStatus(`❌ Error: ${e.error}`, '#d32f2f');
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function listVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            const voiceList = document.getElementById('voiceList');
+            
+            if (voices.length === 0) {
+                voiceList.innerHTML = '<p>⏳ Loading voices...</p>';
+                setTimeout(listVoices, 100);
+                return;
+            }
+
+            let html = `<h3>Available Voices (${voices.length} total)</h3>`;
+            
+            // Highlight potential female voices
+            voices.forEach((voice, index) => {
+                const isFemale = voice.name.toLowerCase().includes('female') || 
+                               voice.name.includes('Zira') ||
+                               ['Samantha', 'Victoria', 'Karen', 'Susan', 'Moira', 'Tessa', 'Fiona'].some(name => voice.name.includes(name));
+                
+                const className = isFemale ? 'voice-item selected' : 'voice-item';
+                html += `<div class="${className}">
+                    ${isFemale ? '👩 ' : ''}${index + 1}. <strong>${voice.name}</strong> - ${voice.lang} 
+                    ${voice.localService ? '(Local)' : '(Cloud)'}
+                </div>`;
+            });
+            
+            voiceList.innerHTML = html;
+            updateStatus(`Found ${voices.filter(v => v.name.toLowerCase().includes('female') || v.name.includes('Zira')).length} female voices`, '#1565c0');
+        }
+
+        // Load voices on page load
+        window.speechSynthesis.onvoiceschanged = listVoices;
+        setTimeout(listVoices, 500);
+    </script>
+</body>
+</html>

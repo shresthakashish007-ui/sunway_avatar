@@ -11,7 +11,10 @@ import rateLimit from "express-rate-limit";
 import chatRouter from "./routes/chat.js";
 import resourcesRouter from "./routes/resources.js";
 import adminRouter from "./routes/admin.js";
-import ttsRouter from "./routes/tts.js";
+import collegeAdminRouter from "./routes/collegeAdmin.js";
+import ttsRouter, { warmVoicePool } from "./routes/tts.js";
+import sttRouter from "./routes/stt.js";
+import { COLLEGES_DIR } from "./services/collegeStore.js";
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -25,21 +28,27 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: "50kb" }));
 
-// Serve static files FIRST (before any other middleware)
-const publicPath = path.resolve(__dirname, "../public");
-console.log(`📁 Serving static files from: ${publicPath}`);
-app.use(express.static(publicPath));
+// Security headers.
+// CSP and COEP stay off: the app loads Google Fonts, remote logos and an
+// external 360-tour iframe, all of which a default CSP/COEP would block.
+// CORP is off so the Vite dev server (port 5173) can load models/images
+// served from this origin.
+app.use(helmet({
+  contentSecurityPolicy:     false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+}));
 
-app.use(cors({ 
+app.use(cors({
   origin: ["http://localhost:5173","http://localhost:5174","http://localhost:5175","http://localhost:3000","http://localhost:3001"],
   credentials: true
 }));
 
-// Security - DISABLED for now to test
-// app.use(helmet({ 
-//   contentSecurityPolicy: false,
-//   crossOriginEmbedderPolicy: false
-// }));
+// Static files are served after CORS/helmet so their responses carry the
+// same headers as the API.
+const publicPath = path.resolve(__dirname, "../public");
+console.log(`📁 Serving static files from: ${publicPath}`);
+app.use(express.static(publicPath));
 
 // Rate limiting for chat endpoint
 const chatLimiter = rateLimit({
@@ -48,17 +57,48 @@ const chatLimiter = rateLimit({
   message:  { success: false, error: "Too many requests. Please slow down." },
 });
 
+// Leads are written to an in-memory store — throttle to stop form spam
+const leadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max:      10,
+  message:  { success: false, error: "Too many submissions. Please try again shortly." },
+});
+
 // ─── Routes ────────────────────────────────────────────────────────────────
-app.use("/api/chat",      chatLimiter, chatRouter);
-app.use("/api/resources", resourcesRouter);
-app.use("/api/admin",     adminRouter);
-app.use("/api/tts",       ttsRouter);
+app.use("/api/chat",             chatLimiter, chatRouter);
+app.use("/api/resources/leads",  leadLimiter);
+app.use("/api/resources",        resourcesRouter);
+app.use("/api/college-admin",    collegeAdminRouter);
+app.use("/api/admin",            adminRouter);
+app.use("/api/tts",              ttsRouter);
+app.use("/api/stt",              sttRouter);
+
+// Uploaded college logos/images: /college-assets/<slug>/<file>
+//   → server/colleges/<slug>/assets/<file>
+// Mapped explicitly rather than serving the colleges folder, so config.json /
+// data.json / faq.json are never publicly readable.
+app.get("/college-assets/:slug/:file", (req, res) => {
+  const { slug, file } = req.params;
+  if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(slug) || !/^[a-zA-Z0-9_.-]+$/.test(file) || file.includes("..")) {
+    return res.status(400).end();
+  }
+  const dir = path.join(COLLEGES_DIR, slug, "assets");
+  const target = path.join(dir, file);
+  if (!target.startsWith(dir)) return res.status(400).end();
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.sendFile(target, (err) => { if (err && !res.headersSent) res.status(404).end(); });
+});
 
 // Health check
 app.get("/api/health", (_, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 
-// Simple rotation status page
+// Simple rotation status page — same token gate as /api/admin
 app.get("/rotation-status", async (req, res) => {
+  const token = req.headers["x-admin-token"] || req.query.token;
+  if (!process.env.ADMIN_PASSWORD || token !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).send("<h1>401 Unauthorized</h1><p>Append ?token=&lt;ADMIN_PASSWORD&gt; to the URL.</p>");
+  }
+  const tokenQuery = `?token=${encodeURIComponent(String(token))}`;
   try {
     const { default: keyRotation } = await import("./services/groqKeyRotation.js");
     const stats = keyRotation.getStats();
@@ -153,17 +193,47 @@ app.get("/rotation-status", async (req, res) => {
   </table>
 
   <p style="margin-top: 20px; color: #666; font-size: 14px;">
-    Last updated: ${new Date().toLocaleString()} | 
-    Current Key: Key ${stats.currentKeyIndex + 1} | 
-    <a href="/rotation-status">Refresh Now</a>
+    Last updated: ${new Date().toLocaleString()} |
+    Current Key: Key ${stats.currentKeyIndex + 1} |
+    <a href="/rotation-status${tokenQuery}">Refresh Now</a>
   </p>
 </body>
 </html>`;
     
     res.send(html);
   } catch (err) {
-    res.status(500).send(`<h1>Error</h1><pre>${err.message}</pre>`);
+    const safe = String(err.message).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+    res.status(500).send(`<h1>Error</h1><pre>${safe}</pre>`);
   }
+});
+
+// ─── Global Error Handler ──────────────────────────────────────────────────
+// Catches any unhandled errors and returns JSON instead of default HTML 500.
+// Only the chat contract gets the friendly 200 fallback — every other route
+// returns a real error status so failures stay visible in logs/monitoring.
+app.use((err, req, res, next) => {
+  console.error("💥 Unhandled Express error:", err.message);
+  console.error("Stack:", err.stack?.split("\n").slice(0, 3).join("\n"));
+
+  if (res.headersSent) return next(err);
+
+  if (!req.path.startsWith("/api/chat")) {
+    return res.status(500).json({ success: false, error: "Internal server error" });
+  }
+
+  // Chat: always return a well-formed reply so the frontend never sees
+  // "Unexpected end of JSON input"
+  res.status(200).json({
+    success: true,
+    reply: "I'm processing your request. Please ask your question again.",
+    language: "en",
+    emotion: "neutral",
+    animation: "talking",
+    intent: "",
+    entities: { program: null, year: null, topic: null },
+    visualAction: { type: "NONE", resourceId: "", title: "" },
+    suggestions: ["BSc CSAI Program", "BIT Program", "Contact Sunway"],
+  });
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
@@ -171,20 +241,53 @@ app.listen(PORT, () => {
   console.log(`\n🌟 Sunway College AI Counselor Backend — http://localhost:${PORT}`);
   
   // Check for API key rotation
-  const hasMultipleKeys = process.env.GROQ_API_KEYS;
-  const hasSingleKey = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== "your_groq_api_key_here";
-  
-  if (hasMultipleKeys) {
-    const keyCount = process.env.GROQ_API_KEYS.split(',').filter(k => k.trim().startsWith('gsk_')).length;
+  const keyCount = [process.env.GROQ_API_KEYS, process.env.GROQ_API_KEY]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map(k => k.trim())
+    .filter(k => k.startsWith("gsk_"))
+    .length;
+
+  if (keyCount > 1) {
     console.log(`🔑 Groq API Keys:       ✅ ${keyCount} keys with automatic rotation`);
     console.log(`📊 Dashboard:           http://localhost:${PORT}/groq-keys-dashboard.html`);
-  } else if (hasSingleKey) {
+  } else if (keyCount === 1) {
     console.log(`🔑 Groq API Key:        ✅ Single key (no rotation)`);
   } else {
     console.log(`🔑 Groq API Key:        ⚠️  NOT SET — add GROQ_API_KEYS to .env`);
   }
-  
+
+  if (!process.env.ADMIN_PASSWORD) {
+    console.log(`🔒 Admin:               ⚠️  ADMIN_PASSWORD not set — /api/admin and /rotation-status are disabled`);
+  }
+
+  import("./services/faqSearch.js")
+    .then(({ faqCount }) => console.log(`❓ Q&A entries:         ✅ ${faqCount()} loaded from server/database/faq.js`))
+    .catch(err => console.log(`❓ Q&A entries:         ⚠️  failed to load faq.js — ${err.message}`));
+
   console.log(`🎙️  TTS Provider:        ✅ Microsoft Edge TTS (FREE - Browser-based)`);
-  console.log(`🤖 Model:               ${process.env.GROQ_MODEL || "openai/gpt-oss-20b"} (1000 T/sec)`);
+
+  // Open the neural-voice sockets now so the first student does not wait
+  // for the ~500ms handshake.
+  warmVoicePool().catch(err => console.warn("🔊 voice warm-up skipped:", err.message));
+  // Which brain is actually answering. Worth printing plainly: "local" means
+  // free and unlimited, "Groq" means the free tier with its rate limits.
+  import("./services/llmProvider.js")
+    .then(async ({ providerStatus, probeLocal }) => {
+      const s = providerStatus();
+      if (!s.localEnabled) {
+        console.log(`🤖 Model:               ${s.groqModel} via Groq (free tier)`);
+        console.log(`🏠 Local model:         off — set LOCAL_LLM=on in .env to run offline`);
+        return;
+      }
+      const up = await probeLocal();
+      console.log(up
+        ? `🤖 Model:               ${s.localModel} running locally ✅ unlimited, offline`
+        : `🤖 Model:               ${s.groqModel} via Groq (local model not reachable at ${s.localUrl})`);
+      console.log(`🔁 Fallback:            ${up ? `Groq (${s.groqModel}) if the local model stops` : `install Ollama + "ollama pull ${s.localModel}" to go offline`}`);
+    })
+    .catch(err => console.log(`🤖 Model:               ⚠️  could not read provider status — ${err.message}`));
+
   console.log(`📚 Programs:            BSc CSAI (4yr) + BSc BIT (3yr) — BCU Partnership\n`);
 });

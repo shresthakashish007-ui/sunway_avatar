@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { getResource, submitLead } from "../../services/chatService";
+import { getCollegeConfig } from "../../services/collegeConfig";
 import {
   Phone, Mail, MapPin, Clock, CheckCircle2, Users, Star,
   Briefcase, TrendingUp, BookOpen, Lightbulb, Award, Target,
   Building2, ExternalLink, ClipboardList, Globe,
 } from "lucide-react";
 
-const R = "#8B1A1A"; const RL = "#FDF2F2";
+const R = "var(--brand)"; const RL = "var(--brand-lighter)";
 
 function Btn({ children, onClick, variant = "primary" }) {
   const [h, setH] = React.useState(false);
@@ -15,7 +16,7 @@ function Btn({ children, onClick, variant = "primary" }) {
       style={{
         background: variant === "primary" ? (h ? "#6b1414" : R) : (h ? RL : "#fff"),
         color: variant === "primary" ? "#fff" : R,
-        border: `1.5px solid ${variant === "primary" ? R : `${R}44`}`,
+        border: `1.5px solid ${variant === "primary" ? R : `rgba(var(--brand-rgb), 0.27)`}`,
         borderRadius: 8, padding: "9px 14px", fontWeight: 600, cursor: "pointer",
         transition: "all 0.15s", fontSize: 12, display: "flex", alignItems: "center", gap: 6,
       }}>
@@ -155,7 +156,7 @@ export function CareersViewer({ resourceId, onQuery }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 8 }}>
         {(prog.careers || []).map((c, i) => (
-          <div key={i} style={{ background: "rgba(255,255,255,0.55)", border: `1px solid ${R}20`, borderRadius: 10, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+          <div key={i} style={{ background: "rgba(255,255,255,0.55)", border: `1px solid rgba(var(--brand-rgb), 0.13)`, borderRadius: 10, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: R, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: "#333", fontWeight: 500 }}>{c}</span>
           </div>
@@ -294,7 +295,7 @@ export function RainViewer({ onQuery }) {
       <h4 style={{ fontSize: 13, fontWeight: 700, color: R, marginBottom: 10 }}>Our Process</h4>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
         {data.stages.map((s, i) => (
-          <div key={i} style={{ background: "rgba(255,255,255,0.55)", border: `1px solid ${R}20`, borderRadius: 10, padding: "10px 10px", textAlign: "center" }}>
+          <div key={i} style={{ background: "rgba(255,255,255,0.55)", border: `1px solid rgba(var(--brand-rgb), 0.13)`, borderRadius: 10, padding: "10px 10px", textAlign: "center" }}>
             <div style={{ width: 22, height: 22, background: R, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 6px", fontSize: 10, fontWeight: 700, color: "#fff" }}>{i + 1}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#333", lineHeight: 1.3 }}>{s}</div>
           </div>
@@ -350,12 +351,12 @@ export function ApplyViewer({ onQuery }) {
         Take the first step towards your future at Sunway College Kathmandu, in academic partnership with Birmingham City University, UK.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <a href="https://sunway.edu.np/apply" target="_blank" rel="noopener noreferrer"
+        <a href={getCollegeConfig().applyUrl || "#"} target="_blank" rel="noopener noreferrer"
           style={{ background: R, color: "#fff", borderRadius: 10, padding: "12px", fontWeight: 700, textDecoration: "none", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <ExternalLink size={16} /> Apply Online
         </a>
         <button onClick={() => onQuery?.("Show required admission documents")}
-          style={{ background: "rgba(255,255,255,0.55)", color: R, border: `1.5px solid ${R}44`, borderRadius: 10, padding: "11px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+          style={{ background: "rgba(255,255,255,0.55)", color: R, border: `1.5px solid rgba(var(--brand-rgb), 0.27)`, borderRadius: 10, padding: "11px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
           View Required Documents
         </button>
         <button onClick={() => onQuery?.("Contact admission office")}

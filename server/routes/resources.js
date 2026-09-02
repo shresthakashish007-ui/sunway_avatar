@@ -1,8 +1,30 @@
 import express from "express";
 import { getResource } from "../services/sunwayKnowledge.js";
 import db from "../database/sunwayData.js";
+import { getConfig, getActiveSlug } from "../services/collegeStore.js";
 
 const router = express.Router();
+
+// Public branding for the active college — read by the frontend on startup so
+// the name, colours, logo and links come from config.json instead of being
+// hard-coded. Only whitelisted fields are exposed.
+const PUBLIC_CONFIG_FIELDS = [
+  "slug", "name", "shortName", "tagline", "assistantName", "builtBy",
+  "brandColor", "brandColorDark", "logoUrl", "buildingImage",
+  "pageBackground", "avatarBackground",
+  "applyUrl", "virtualTourUrl", "website",
+  // Spoken welcome line + the language it is written in, so each college can
+  // greet students in its own words and voice.
+  "greetingText", "greetingLang",
+];
+
+router.get("/college-config", (_req, res) => {
+  const cfg = getConfig() || {};
+  const out = {};
+  for (const k of PUBLIC_CONFIG_FIELDS) if (cfg[k] !== undefined) out[k] = cfg[k];
+  out.slug = out.slug || getActiveSlug();
+  res.json({ success: true, data: out });
+});
 
 router.get("/programs",            (_, res) => res.json({ success:true, data: db.programs }));
 router.get("/programs/:id",        (req, res) => { const d = getResource("program", req.params.id); d ? res.json({success:true,data:d}) : res.status(404).json({success:false,error:"Not found"}); });

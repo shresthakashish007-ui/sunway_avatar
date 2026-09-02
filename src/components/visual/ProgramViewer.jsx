@@ -2,10 +2,20 @@ import React, { useEffect, useState } from "react";
 import { getResource } from "../../services/chatService";
 import { Calendar, Award, Users, ChevronRight, BookOpen, Briefcase } from "lucide-react";
 
-const R = "#8B1A1A"; const RL = "#FDF2F2";
+const R = "var(--brand)"; const RL = "var(--brand-lighter)";
 
+// The tint has to follow whatever `color` is passed — this renders white on
+// the brand-coloured header band, not brand-on-brand. color-mix works with
+// both a hex value and a CSS variable, which hex-alpha suffixes cannot.
 function Tag({ children, color = R }) {
-  return <span style={{ background: `${color}18`, color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{children}</span>;
+  return (
+    <span style={{
+      background: `color-mix(in srgb, ${color} 10%, transparent)`,
+      color,
+      border: `1px solid color-mix(in srgb, ${color} 19%, transparent)`,
+      borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 700,
+    }}>{children}</span>
+  );
 }
 
 function Btn({ children, onClick, variant = "primary", small }) {
@@ -17,7 +27,7 @@ function Btn({ children, onClick, variant = "primary", small }) {
       style={{
         background: h ? (isPrimary ? "#6b1414" : RL) : (isPrimary ? R : "#fff"),
         color: isPrimary ? "#fff" : R,
-        border: `1.5px solid ${isPrimary ? (h ? "#6b1414" : R) : `${R}44`}`,
+        border: `1.5px solid ${isPrimary ? (h ? "#6b1414" : R) : `rgba(var(--brand-rgb), 0.27)`}`,
         borderRadius: 8, padding: small ? "6px 12px" : "9px 14px",
         fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
         fontSize: small ? 11 : 12, display: "flex", alignItems: "center", gap: 5,
@@ -90,7 +100,17 @@ function ProgramCard({ p, onQuery }) {
 /* ── Programs list ───────────────────────────────────────────────────────── */
 export function ProgramsListViewer({ onQuery }) {
   const [programs, setPrograms] = useState([]);
-  useEffect(() => { getResource("programs").then(r => setPrograms(r.data || [])).catch(() => {}); }, []);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => { 
+    setLoading(true);
+    getResource("programs")
+      .then(r => setPrograms(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false)); 
+  }, []);
+  
+  if (loading) return <LoadState />;
   return (
     <div style={{ padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
@@ -110,8 +130,35 @@ export function ProgramsListViewer({ onQuery }) {
 /* ── Single program viewer ───────────────────────────────────────────────── */
 export function ProgramViewer({ resourceId, onQuery }) {
   const [p, setP] = useState(null);
-  useEffect(() => { if (resourceId) getResource("programs", resourceId).then(r => setP(r.data)).catch(() => {}); }, [resourceId]);
-  if (!p) return <LoadState />;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  // The model emits ids like "csai", "csai-program" or "bsc-bit" — map them
+  // all onto the two real program ids instead of 404-ing on the variants.
+  const pid = (() => {
+    const raw = String(resourceId || "").toLowerCase();
+    if (raw.includes("bit")) return "bit";
+    if (raw.includes("csai") || raw.includes("ai")) return "csai";
+    return raw;
+  })();
+
+  useEffect(() => {
+    if (!pid) {
+      setLoading(false);
+      setError(true);
+      return;
+    }
+    setLoading(true);
+    setError(false);
+    getResource("programs", pid)
+      .then(r => { setP(r.data); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, [pid]);
+
+
+  if (loading) return <LoadState />;
+  if (error || !p) return <div style={{ padding: 32, textAlign: "center", color: "#aaa", fontSize: 13 }}>Program details not found.</div>;
+
   return (
     <div style={{ padding: "18px 20px" }}>
       <ProgramCard p={p} onQuery={onQuery} />

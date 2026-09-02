@@ -3,153 +3,157 @@ import { AvatarScene } from "./components/avatar/AvatarScene";
 import { VisualPanel } from "./components/visual/VisualPanel";
 import { useAssistantStore } from "./store/assistantStore";
 import { useChat } from "./hooks/useChat";
-import { startListening as _startListening, stopListening as _stopListening, isSupported } from "./services/voiceService";
-import { setMuted as _setMuted, speak, stopSpeaking } from "./services/ttsService";
+import { startListening as _startListening, stopListening as _stopListening, finishListening as _finishListening, isSupported } from "./services/voiceService";
+import { speak, stopSpeaking, preloadVoices } from "./services/ttsService";
+import { loadCollegeConfig, getCollegeConfig } from "./services/collegeConfig";
 import {
-  Home, RotateCcw, Mic, Send, Bot,
-  Square,
+  Home, RotateCcw, Mic, Send,
+  Square, Minus, MessageCircle, Sparkles
 } from "lucide-react";
 import "./index.css";
 
 // Sunway Brand Colors - Red/White Theme
-const SUNWAY_RED = "#B51F24";
-const DARK_RED = "#8F171B";
-const DEEP_BURGUNDY = "#781316";
-const LIGHT_RED = "#FDE8E8";
-const VERY_LIGHT_RED = "#FFF4F4";
-const BG_OFF_WHITE = "#F8F8F8";
+const SUNWAY_RED = "var(--brand)";
+const DARK_RED = "var(--brand-dark)";
+const LIGHT_RED = "var(--brand-light)";
+const VERY_LIGHT_RED = "var(--brand-lighter)";
 const PURE_WHITE = "#FFFFFF";
 const PRIMARY_TEXT = "#252525";
 const SECONDARY_TEXT = "#777777";
 const BORDER = "#E8E8E8";
-const SOFT_RED_BORDER = "#F0D4D4";
-
-// Legacy aliases for compatibility
-const MAROON = SUNWAY_RED;
-const MAROON_LIGHT = LIGHT_RED;
+const SOFT_RED_BORDER = "var(--brand-border)";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Welcome greeting (once per session)
-   Sequence:
-     1. After 800ms  — play Namaste animation
-     2. After 1200ms — speak fixed "Namaste, welcome to Sunway College" line
-     3. After speech ends — trigger AI welcome message for suggestions/visual
+
+   Spoken in Nepali by the real ne-NP neural voice, and the bow is started by
+   the AUDIO, not by a timer:
+
+     1. Branding loads → we know the college name and its greeting line
+     2. speak() is called immediately — no arbitrary wait
+     3. The moment sound actually leaves the speakers, onStart fires and the
+        namaste animation begins, so the bow lands on "नमस्ते"
+     4. onEnd → back to idle, then the AI is asked (silently) for suggestions
+
+   The old version played the animation on an 800ms timer while the audio was
+   still loading, so the bow and the word drifted apart by however long the
+   network happened to take.
 ───────────────────────────────────────────────────────────────────────── */
-function useWelcomeGreeting() {
+function useWelcomeGreeting(shouldTrigger = true) {
   const {
     welcomeShown, setWelcomeShown,
     setCurrentAnimation, setAvatarState, setCurrentEmotion,
   } = useAssistantStore();
   const { sendChat } = useChat();
 
+  const [configReady, setConfigReady] = useState(false);
+  // Survives StrictMode's double-invoke and any re-render, so the greeting
+  // speaks exactly once per session.
+  const greetedRef = useRef(false);
+
+  // Branding must be loaded before the greeting speaks, otherwise it would
+  // announce the placeholder college name.
   useEffect(() => {
-    if (welcomeShown) return;
+    let cancelled = false;
+    loadCollegeConfig().then(() => { if (!cancelled) setConfigReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
-    // Step 1 — play Namaste animation after a short delay (model loads)
-    const t1 = setTimeout(() => {
-      setWelcomeShown(true);
-      setCurrentEmotion("happy");
-      setAvatarState("talking");
-      setCurrentAnimation("Namaste");
+  useEffect(() => {
+    // Preload system voices on app startup for faster first response
+    preloadVoices();
 
-      // Step 2 — speak the fixed greeting line
-      speak("Namaste! Welcome to Sunway College Kathmandu. I am your AI admission assistant. How can I help you today?", {
-        onStart: () => {
-          setAvatarState("talking");
-          setCurrentAnimation("Namaste");
-        },
-        onEnd: () => {
-          // Step 3 — after speech ends, go idle then fire AI for suggestions
-          setAvatarState("idle");
-          setCurrentAnimation("Idle");
-          setCurrentEmotion("neutral");
-          // Fire AI silently in background to populate suggestions & visual panel
-          sendChat("welcome - just show the home panel and give 3-4 helpful suggestion pills, no long reply needed", { silent: true, hidden: true });
-        },
-      });
-    }, 800);
+    if (welcomeShown || !shouldTrigger || !configReady) return;
 
-    return () => clearTimeout(t1);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Ref guard rather than relying on `welcomeShown` alone: that is store
+    // state, so setting it re-runs this effect and React would tear down the
+    // in-flight greeting before it ever reached the speakers.
+    if (greetedRef.current) return;
+    greetedRef.current = true;
+
+    setWelcomeShown(true);
+    setCurrentEmotion("happy");
+
+    const cfg = getCollegeConfig();
+    // The college's own words if it has set them, otherwise a plain English
+    // line so a newly-created college still greets people.
+    const line = cfg.greetingText?.trim()
+      || `Namaste! Welcome to ${cfg.name}. I am your AI admission assistant. How can I help you today?`;
+    const lang = cfg.greetingText?.trim() ? (cfg.greetingLang || "ne") : "en";
+
+    // No settle timer: she is already standing (the controller starts on the
+    // idle pose), and speak() spends ~300ms fetching audio anyway. Waiting
+    // first only delayed the greeting.
+    speak(line, {
+      lang,
+      onStart: () => {
+        // Sound is leaving the speakers RIGHT NOW — bow on this frame.
+        setAvatarState("talking");
+        setCurrentAnimation("Namaste");
+      },
+      onEnd: () => {
+        setAvatarState("idle");
+        setCurrentAnimation("Idle");
+        setCurrentEmotion("neutral");
+        // Fire AI silently in background to populate suggestions & visual panel
+        sendChat("welcome - just show the home panel and give 3-4 helpful suggestion pills, no long reply needed", { silent: true, hidden: true });
+      },
+    });
+  }, [welcomeShown, shouldTrigger, configReady]);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    Top Navigation Bar
 ───────────────────────────────────────────────────────────────────────── */
-function TopBar({ onHome, onReset }) {
+function TopBar({ onHome, onReset, onBackToWidget }) {
   return (
     <div style={{
-      height: 80,
-      background: "rgba(255,255,255,0.55)",
-      backdropFilter: "blur(8px)",
-      borderBottom: "1px solid rgba(255,255,255,0.3)",
-      display: "flex", alignItems: "center",
-      padding: "0 24px", flexShrink: 0,
-      boxShadow: "0 1px 8px rgba(0,0,0,0.08)",
+      height: 72,
+      background: "#FFFFFF",
+      borderBottom: "1px solid rgba(0,0,0,0.04)",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 32px", flexShrink: 0,
+      boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
+      zIndex: 50, position: "relative"
     }}>
-      {/* Logo + name */}
-      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+      {/* Left side: Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <img
-          src="https://media.edusanjal.com/__sized__/logos/sunway_lolo-thumbnail-200x200-70.jpg"
-          alt="Sunway College"
-          style={{
-            width: 60, height: 60, borderRadius: 10,
-            objectFit: "cover",
-            border: "1.5px solid #f0f0f0",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-          }}
+          src={getCollegeConfig().logoUrl || "/my-logo.png"}
+          alt={getCollegeConfig().name}
+          style={{ height: 42, width: "auto", objectFit: "contain" }}
         />
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 14.5, color: "#1a1a1a", lineHeight: 1.2, letterSpacing: "-0.02em" }}>
-            Sunway College
-          </div>
-          <div style={{ fontSize: 11, color: "#999", fontWeight: 400, marginTop: 1 }}>Kathmandu, Nepal</div>
-        </div>
       </div>
 
-      {/* Divider */}
-      <div style={{ width: 1, height: 28, background: "#f0f0f0", margin: "0 20px" }} />
-
-      {/* AI badge */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 7,
-        background: VERY_LIGHT_RED,
-        border: `1px solid ${SUNWAY_RED}25`,
-        borderRadius: 20, padding: "5px 14px",
-      }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", background: SUNWAY_RED }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: SUNWAY_RED, letterSpacing: "0.02em" }}>
-          AI Admission Assistant
-        </span>
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Buttons */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <NavBtn Icon={Home}       label="Home"       onClick={onHome} />
-        <NavBtn Icon={RotateCcw}  label="Reset Chat" onClick={onReset} />
+      {/* Right side: Controls */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <IconBtn Icon={Home} onClick={onHome} tooltip="Home" />
+        <IconBtn Icon={RotateCcw} onClick={onReset} tooltip="Reset Chat" />
+        {onBackToWidget && (
+          <IconBtn Icon={Minus} onClick={onBackToWidget} tooltip="Minimize" />
+        )}
       </div>
     </div>
   );
 }
 
-function NavBtn({ Icon, label, onClick }) {
+function IconBtn({ Icon, onClick, tooltip }) {
   const [h, setH] = useState(false);
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} title={tooltip}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        display: "flex", alignItems: "center", gap: 6,
-        background: h ? MAROON_LIGHT : "#fff",
-        border: `1.5px solid ${h ? MAROON + "55" : "#e8e8e8"}`,
-        borderRadius: 9, padding: "6px 14px",
-        fontSize: 12.5, fontWeight: 700,
-        color: MAROON,
-        cursor: "pointer", transition: "all 0.15s",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: h ? VERY_LIGHT_RED : "#fff",
+        border: `1px solid ${h ? SUNWAY_RED : "#E8E8E8"}`,
+        borderRadius: 12, padding: "10px",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        width: 40, height: 40,
+        boxShadow: h ? `0 4px 12px rgba(var(--brand-rgb), 0.13)` : "none",
+        transform: h ? "translateY(-1px)" : "none"
       }}>
-      <Icon size={13} strokeWidth={2.2} color={MAROON} />
-      {label}
+      <Icon size={18} strokeWidth={2.5} color={h ? SUNWAY_RED : "#555"} />
     </button>
   );
 }
@@ -158,44 +162,18 @@ function NavBtn({ Icon, label, onClick }) {
    Left Panel — Avatar only
 ───────────────────────────────────────────────────────────────────────── */
 
-function LeftPanel({ onQuery }) {
-  const { avatarState, isLoading } = useAssistantStore();
-  const state = isLoading ? "thinking" : avatarState;
-  const statusLabel = {
-    thinking: "Thinking...", listening: "Listening...", talking: "Speaking...",
-  }[state] || null;
-
+function LeftPanel() {
   return (
     <div style={{
-      width: 520, flexShrink: 0,
+      width: 540, flexShrink: 0,
       display: "flex", flexDirection: "column",
-      background: "transparent",
-      borderRight: "1px solid rgba(255,255,255,0.2)",
-      overflow: "hidden",
       position: "relative",
+      overflow: "hidden"
     }}>
-      {/* Avatar fills the entire left panel */}
-      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+      {/* Avatar Scene */}
+      <div style={{ flex: 1, position: "relative", zIndex: 0 }}>
         <AvatarScene />
       </div>
-
-      {/* Status badge only — no text, no buttons */}
-      {statusLabel && (
-        <div style={{
-          position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-          background: `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})`,
-          color: "#fff",
-          padding: "5px 16px", borderRadius: 20,
-          fontSize: 11.5, fontWeight: 700,
-          display: "flex", alignItems: "center", gap: 7,
-          backdropFilter: "blur(8px)",
-          zIndex: 10,
-          boxShadow: `0 4px 12px ${SUNWAY_RED}40`,
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff", display: "inline-block", animation: "pulse 1.2s infinite" }} />
-          {statusLabel}
-        </div>
-      )}
     </div>
   );
 }
@@ -220,12 +198,19 @@ function Bubble({ msg }) {
     }}>
       {!isUser && (
         <div style={{
-          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-          background: `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})`,
+          width: 80, height: 80, borderRadius: "8px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: `0 3px 10px ${SUNWAY_RED}35`, marginTop: 2,
+          marginTop: 2, overflow: "hidden",
         }}>
-          <Bot size={16} color="#fff" strokeWidth={2.2} />
+          <img
+            src="/img/bot-robot.png"
+            alt="Bot"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
+          />
         </div>
       )}
       <div style={{ maxWidth: "73%" }}>
@@ -236,9 +221,9 @@ function Bubble({ msg }) {
             ? `linear-gradient(135deg, ${VERY_LIGHT_RED}, ${LIGHT_RED})`
             : "rgba(255,255,255,0.95)",
           color: PRIMARY_TEXT, fontSize: 14, lineHeight: 1.65,
-          border: isUser ? `1px solid ${SUNWAY_RED}15` : `1px solid ${BORDER}`,
+          border: isUser ? `1px solid rgba(var(--brand-rgb), 0.08)` : `1px solid ${BORDER}`,
           boxShadow: isUser
-            ? `0 2px 8px ${SUNWAY_RED}08`
+            ? `0 2px 8px rgba(var(--brand-rgb), 0.03)`
             : "0 2px 10px rgba(0,0,0,0.05)",
         }}>
           {msg.loading ? <TypingDots /> : msg.content}
@@ -261,7 +246,7 @@ function Bubble({ msg }) {
 function TypingDots() {
   return (
     <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
-      {[0,1,2].map(i => (
+      {[0, 1, 2].map(i => (
         <span key={i} style={{
           width: 6, height: 6, borderRadius: "50%", background: "#ccc",
           animation: `blink 1s infinite ${i * 0.2}s`, display: "inline-block",
@@ -288,11 +273,54 @@ function SuggPill({ label, onClick }) {
         cursor: "pointer",
         transition: "all 0.25s ease",
         whiteSpace: "nowrap",
-        boxShadow: h ? `0 2px 8px ${SUNWAY_RED}15` : "0 1px 3px rgba(0,0,0,0.03)",
+        boxShadow: h ? `0 2px 8px rgba(var(--brand-rgb), 0.08)` : "0 1px 3px rgba(0,0,0,0.03)",
         transform: h ? "translateY(-1px)" : "translateY(0)",
       }}>
       {label}
     </button>
+  );
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Speech language picker
+
+   Telling Whisper which language is being spoken is the single biggest
+   accuracy lever: forcing English on Nepali speech scored 13.9%, auto-detect
+   62.8%, naming the language 91.3%. "Auto" stays the default so a wrong
+   guess can never be catastrophic.
+───────────────────────────────────────────────────────────────────────── */
+const STT_LANGS = [
+  { id: "auto", label: "Auto",     hint: "Detect the language automatically" },
+  { id: "en",   label: "English",  hint: "Speak in English" },
+  { id: "ne",   label: "नेपाली",    hint: "नेपालीमा बोल्नुहोस्" },
+  { id: "hi",   label: "हिंदी",     hint: "हिंदी में बोलें" },
+];
+
+function SpeechLangPicker({ compact }) {
+  const { sttLang, setSttLang } = useAssistantStore();
+  return (
+    <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ fontSize: compact ? 10 : 10.5, color: SECONDARY_TEXT, fontWeight: 600 }}>
+        Mic:
+      </span>
+      {STT_LANGS.map(l => {
+        const on = sttLang === l.id;
+        return (
+          <button key={l.id} title={l.hint} onClick={() => setSttLang(l.id)}
+            style={{
+              background: on ? SUNWAY_RED : "transparent",
+              color: on ? "#fff" : SECONDARY_TEXT,
+              border: `1px solid ${on ? SUNWAY_RED : BORDER}`,
+              borderRadius: 14, padding: compact ? "2px 8px" : "3px 10px",
+              fontSize: compact ? 10.5 : 11, fontWeight: 700, cursor: "pointer",
+              lineHeight: 1.5,
+            }}>
+            {l.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -301,13 +329,18 @@ function SuggPill({ label, onClick }) {
 ───────────────────────────────────────────────────────────────────────── */
 function ChatInput({ onSend, isLoading }) {
   const {
-    isListening, isMuted, suggestions,
-    setIsListening, setIsMuted, setAvatarState,
+    isListening, suggestions,
+    setIsListening, setAvatarState,
   } = useAssistantStore();
   const [input, setInput] = useState("");
   const [transcript, setTr] = useState("");
   const [countdown, setCountdown] = useState(20);
   const countdownRef = useRef(null);
+  // Mirrors `transcript` so the speech callbacks can read the latest value
+  // without submitting from inside a setState updater (React runs those twice
+  // under StrictMode, which sent every voice message twice).
+  const transcriptRef = useRef("");
+  const setTranscript = useCallback((t) => { transcriptRef.current = t; setTr(t); }, []);
 
   // Start/stop countdown timer visually
   useEffect(() => {
@@ -335,32 +368,38 @@ function ChatInput({ onSend, isLoading }) {
 
   const toggleMic = () => {
     if (!isSupported()) return;
-    
+
     // 🛑 INTERRUPT: Stop any ongoing speech when mic is clicked
     stopSpeaking();
     console.log('[MIC-DESKTOP] 🛑 Stopping speech to listen');
-    
+
     if (isListening) {
-      // User clicked stop — submit whatever was heard
-      _stopListening();
+      // User clicked stop. finishListening() still sends the recorded audio to
+      // Whisper, and the transcript comes back through onEnd below — so don't
+      // submit here or the message would be sent twice.
       setIsListening(false);
       setAvatarState("idle");
-      if (transcript.trim()) { onSend(transcript); setTr(""); }
+      _finishListening();
       return;
     }
-    setTr("");
+    setTranscript("");
     setIsListening(true);
     setAvatarState("listening");
     _startListening({
+      lang: useAssistantStore.getState().sttLang,
       onResult: (text) => {
-        setTr(text); // just update display; user clicks stop to submit
+        setTranscript(text); // just update display; user clicks stop to submit
       },
-      onError: () => { setIsListening(false); setAvatarState("idle"); setTr(""); },
-      onEnd: () => {
-        // Timeout fired (20s) — auto-submit if there's text
+      onError: () => { setIsListening(false); setAvatarState("idle"); setTranscript(""); },
+      onEnd: (finalText) => {
+        // Fires on silence, timeout or the stop button. finalText is Whisper's
+        // transcript when it succeeded; otherwise fall back to what the
+        // browser heard live.
         setIsListening(false);
         setAvatarState("idle");
-        setTr(prev => { if (prev.trim()) onSend(prev); return ""; });
+        const heard = (finalText || transcriptRef.current || "").trim();
+        setTranscript("");
+        if (heard) onSend(heard);
       },
     });
   };
@@ -373,7 +412,7 @@ function ChatInput({ onSend, isLoading }) {
       background: "rgba(255,255,255,0.65)",
       backdropFilter: "blur(12px)",
       WebkitBackdropFilter: "blur(12px)",
-      borderTop: `1px solid ${SOFT_RED_BORDER}30`,
+      borderTop: `1px solid rgba(var(--brand-rgb), 0.19)`,
       padding: "14px 20px 16px",
     }}>
       {/* Suggestion pills */}
@@ -382,6 +421,9 @@ function ChatInput({ onSend, isLoading }) {
           {suggestions.map((s, i) => <SuggPill key={i} label={s} onClick={() => onSend(s)} />)}
         </div>
       )}
+
+      {/* Speech language picker */}
+      <div style={{ marginBottom: 8 }}><SpeechLangPicker /></div>
 
       {/* Listening status bar */}
       {isListening && (
@@ -418,27 +460,17 @@ function ChatInput({ onSend, isLoading }) {
 
       {/* Input pill - Premium floating style */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        background: PURE_WHITE,
-        border: `1.5px solid ${isListening ? "#6ee7b7" : BORDER}`,
-        borderRadius: 22, padding: "8px 8px 8px 18px",
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#F8F8F8",
+        border: `1.5px solid ${isListening ? "#6ee7b7" : "transparent"}`,
+        borderRadius: 30, padding: "8px 8px 8px 20px",
         transition: "all 0.2s ease",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
-      }}>
-        {/* Mic toggle */}
-        <button onClick={toggleMic}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            padding: "4px 2px", display: "flex", alignItems: "center",
-            color: isListening ? SUNWAY_RED : "#bbb",
-            transition: "color 0.15s",
-          }}>
-          {isListening
-            ? <Square size={16} color={SUNWAY_RED} fill={SUNWAY_RED} />
-            : <Mic size={17} color="#bbb" />}
-        </button>
-
-        {/* Text input */}
+      }}
+      onFocus={(e) => { e.currentTarget.style.background = "#FFF"; e.currentTarget.style.borderColor = SUNWAY_RED; e.currentTarget.style.boxShadow = `0 0 0 4px ${VERY_LIGHT_RED}`; }}
+      onBlur={(e) => { e.currentTarget.style.background = "#F8F8F8"; e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
+      >
+        <Sparkles size={18} color={SUNWAY_RED} />
+        
         <input
           value={isListening ? (transcript || "") : input}
           onChange={e => { if (!isListening) setInput(e.target.value); }}
@@ -447,36 +479,52 @@ function ChatInput({ onSend, isLoading }) {
           disabled={isListening}
           style={{
             flex: 1, background: "none", border: "none", outline: "none",
-            fontSize: 14, color: PRIMARY_TEXT, padding: "6px 0",
+            fontSize: 15, color: PRIMARY_TEXT, padding: "8px 0",
           }}
         />
+
+        {/* Mic toggle */}
+        <button onClick={toggleMic}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: "8px", display: "flex", alignItems: "center",
+            color: isListening ? SUNWAY_RED : "#888",
+            transition: "color 0.15s",
+          }}>
+          {isListening
+            ? <Square size={18} color={SUNWAY_RED} fill={SUNWAY_RED} />
+            : <Mic size={18} color="#888" />}
+        </button>
 
         {/* Send button - Premium style */}
         <button onClick={submit} disabled={!canSend}
           style={{
-            width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
-            background: canSend ? `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})` : "#e5e7eb",
+            width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0,
+            background: canSend ? `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})` : "#E5E5E5",
             cursor: canSend ? "pointer" : "not-allowed",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: canSend ? `0 4px 12px ${SUNWAY_RED}50` : "none",
+            boxShadow: canSend ? `0 4px 12px rgba(var(--brand-rgb), 0.25)` : "none",
             transition: "all 0.2s ease",
             transform: canSend ? "scale(1)" : "scale(0.95)",
           }}
           onMouseEnter={e => { if (canSend) e.currentTarget.style.transform = "scale(1.05)"; }}
           onMouseLeave={e => { if (canSend) e.currentTarget.style.transform = "scale(1)"; }}
         >
-          <Send size={15} color={canSend ? "#fff" : "#aaa"} />
+          <Send size={16} color={canSend ? "#fff" : "#aaa"} />
         </button>
       </div>
 
-      {/* Footer */}
+      {/* Footer with RGB border effect */}
       <div style={{
-        textAlign: "center", marginTop: 10, fontSize: 12,
+        margin: "10px auto 0",
+        textAlign: "center", fontSize: 12,
         display: "flex", alignItems: "center",
         justifyContent: "center", gap: 6,
-        background: "rgba(255,255,255,0.8)",
-        borderRadius: 20, padding: "5px 16px",
-        width: "fit-content", margin: "10px auto 0",
+        background: "rgba(255,255,255,0.9)",
+        borderRadius: "20px", padding: "5px 16px",
+        border: "2px solid #ff0000",
+        animation: "rgbBorder 3s linear infinite",
+        width: "fit-content",
       }}>
         <span style={{ color: SECONDARY_TEXT, fontWeight: 500 }}>Powered By</span>
         <img
@@ -497,47 +545,87 @@ function ChatInput({ onSend, isLoading }) {
    Right Panel — Chat messages + Visual cards
 ───────────────────────────────────────────────────────────────────────── */
 function RightPanel({ onQuery }) {
-  const { messages, isLoading } = useAssistantStore();
+  const { messages, isLoading, visualAction, avatarState } = useAssistantStore();
   const endRef = useRef(null);
 
+  // Auto-scroll when messages or visual panels change
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Small delay to ensure DOM has updated
+    const timer = setTimeout(() => {
+      if (endRef.current) {
+        endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages, visualAction]);
+
+  // Hide visual panel while the bot is processing or speaking, but NOT during the initial greeting (messages.length === 0)
+  const isBotActive = messages.length > 0 && (isLoading || avatarState === "thinking" || avatarState === "talking" || avatarState === "listening");
+
+  // Check if there's an active visual panel showing
+  const hasVisualPanel = visualAction?.type &&
+    visualAction.type !== "NONE" &&
+    visualAction.type !== "SHOW_NONE" &&
+    visualAction.type !== "WELCOME" &&
+    !isBotActive;
 
   return (
     <div style={{
       flex: 1, display: "flex", flexDirection: "column",
-      minWidth: 0, overflow: "hidden",
-      background: `
-        radial-gradient(ellipse at top right, ${VERY_LIGHT_RED}40 0%, transparent 50%),
-        radial-gradient(ellipse at bottom left, ${VERY_LIGHT_RED}30 0%, transparent 60%),
-        ${BG_OFF_WHITE}
-      `,
-      padding: "0 12px 12px 8px",
+      minWidth: 0, padding: "16px 24px 16px 0"
     }}>
-      {/* Scrollable area */}
       <div style={{
-        flex: 1, overflowY: "auto", minHeight: 0,
-        padding: "20px 22px 8px",
-        background: "transparent",
+        flex: 1, display: "flex", flexDirection: "column",
+        background: "#FFFFFF",
+        borderRadius: 24,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.08)",
+        border: "1px solid rgba(0,0,0,0.04)",
+        overflow: "hidden"
       }}>
-        {messages.length === 0 && (
-          <div style={{
-            textAlign: "center", color: "#ccc", fontSize: 13,
-            marginTop: 40, fontStyle: "italic",
-          }}>
-            Use the quick actions on the left or type your question below 👇
+        {/* Content Area */}
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
+          background: "#FAFAFA"
+        }}>
+          {/* Messages container */}
+          <div
+            style={{
+              flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0,
+              padding: "16px",
+              display: hasVisualPanel ? "none" : "flex",
+              flexDirection: "column",
+            }}>
+            
+            {messages.length === 0 && !hasVisualPanel && (
+              <div style={{ textAlign: "center", color: "#aaa", fontSize: 14, marginTop: 40, fontStyle: "italic" }}>
+                Use the quick actions or type your question below 👇
+              </div>
+            )}
+
+            {messages.length > 0 && (
+              <div style={{ marginBottom: 8, minHeight: "fit-content", flex: "0 0 auto" }}>
+                {messages.map(m => <Bubble key={m.id} msg={m} />)}
+              </div>
+            )}
+            
+            <div ref={endRef} style={{ height: 1, marginTop: 12, flex: "0 0 auto" }} />
           </div>
-        )}
-        {messages.map(m => <Bubble key={m.id} msg={m} />)}
-        <div ref={endRef} />
 
-        {/* Visual cards appear inline below messages */}
-        <VisualPanel onQuery={onQuery} />
+          {/* Visual Panel container */}
+          {hasVisualPanel && (
+            <div style={{
+              flex: 1, overflowY: "auto", minHeight: 0,
+              padding: "16px",
+              display: "flex", flexDirection: "column",
+            }}>
+              <VisualPanel onQuery={onQuery} />
+            </div>
+          )}
+        </div>
+
+        {/* Chat Input */}
+        <ChatInput onSend={onQuery} isLoading={isLoading} />
       </div>
-
-      {/* Fixed chat input at bottom */}
-      <ChatInput onSend={onQuery} isLoading={isLoading} />
     </div>
   );
 }
@@ -550,9 +638,9 @@ function StatusBadgeMobile() {
   const state = isLoading ? "thinking" : avatarState;
   if (state === "idle") return null;
   const cfg = {
-    thinking:  { label: "Thinking", color: DARK_RED },
+    thinking: { label: "Thinking", color: DARK_RED },
     listening: { label: "Listening", color: "#059669" },
-    talking:   { label: "Speaking",  color: SUNWAY_RED },
+    talking: { label: "Speaking", color: SUNWAY_RED },
   }[state];
   if (!cfg) return null;
   return (
@@ -571,21 +659,161 @@ function StatusBadgeMobile() {
 /* ─────────────────────────────────────────────────────────────────────────
    Mobile Messages + Visual
 ───────────────────────────────────────────────────────────────────────── */
+function MobileBubble({ msg }) {
+  const isUser = msg.role === "user";
+  const time = (() => {
+    try { return new Date(msg.id).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+    catch { return ""; }
+  })();
+
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: isUser ? "flex-end" : "flex-start",
+      alignItems: "flex-start",
+      gap: 8, marginBottom: 12,
+      animation: "slideUp 0.25s ease",
+    }}>
+      {!isUser && (
+        <div style={{
+          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#f5f5f5",
+          overflow: "hidden",
+        }}>
+          <img
+            src="/img/bot-robot.png"
+            alt="Bot"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
+          />
+        </div>
+      )}
+      <div style={{ maxWidth: isUser ? "75%" : "80%", minWidth: 0 }}>
+        <div style={{
+          padding: "10px 14px",
+          borderRadius: isUser ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+          background: isUser
+            ? `linear-gradient(135deg, ${VERY_LIGHT_RED}, ${LIGHT_RED})`
+            : "#fff",
+          color: PRIMARY_TEXT, fontSize: 13.5, lineHeight: 1.6,
+          border: isUser ? `1px solid rgba(var(--brand-rgb), 0.08)` : "1px solid #e8e8e8",
+          boxShadow: isUser
+            ? `0 1px 4px rgba(var(--brand-rgb), 0.03)`
+            : "0 1px 4px rgba(0,0,0,0.06)",
+          wordWrap: "break-word",
+          overflowWrap: "break-word",
+        }}>
+          {msg.loading ? <TypingDots /> : msg.content}
+        </div>
+        {time && (
+          <div style={{
+            fontSize: 10, color: "#aaa", marginTop: 3,
+            textAlign: isUser ? "right" : "left",
+            paddingLeft: isUser ? 0 : 2,
+            fontWeight: 500,
+          }}>
+            {time}{isUser && <span style={{ marginLeft: 4 }}>✓</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MobileMessages({ onQuery }) {
-  const { messages } = useAssistantStore();
+  const { messages, visualAction, avatarState, isLoading } = useAssistantStore();
   const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // Auto-scroll when messages or visual panels change  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (endRef.current) {
+        endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages, visualAction]);
+
+  // Hide visual panel while the bot is processing or speaking, but NOT during the initial greeting (messages.length === 0)
+  const isBotActive = messages.length > 0 && (isLoading || avatarState === "thinking" || avatarState === "talking" || avatarState === "listening");
+
+  // Check if there's an active visual panel showing
+  const hasVisualPanel = visualAction?.type &&
+    visualAction.type !== "NONE" &&
+    visualAction.type !== "SHOW_NONE" &&
+    visualAction.type !== "WELCOME" &&
+    !isBotActive;
 
   return (
     <>
-      {messages.length === 0 && (
-        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.7)", fontSize: 12, padding: "10px 0", fontStyle: "italic" }}>
-          Ask me anything about Sunway College 👇
+      {messages.length === 0 && !hasVisualPanel && (
+        <div style={{ textAlign: "center", color: "#999", fontSize: 12, padding: "20px 0", fontStyle: "italic" }}>
+          {`Ask me anything about ${getCollegeConfig().shortName} 👇`}
         </div>
       )}
-      {messages.map(m => <Bubble key={m.id} msg={m} />)}
-      <div ref={endRef} />
-      <VisualPanel onQuery={onQuery} />
+
+      {/* Chat History - Only show when visual panel is NOT active */}
+      {!hasVisualPanel && messages.length > 0 && (
+        <div style={{
+          marginBottom: 0,
+          minHeight: "fit-content"
+        }}>
+          {/* Render ALL messages */}
+          <div style={{ paddingTop: 0 }}>
+            {messages.map(m => <MobileBubble key={m.id} msg={m} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Visual Panel with CLEAR separator */}
+      {hasVisualPanel && (
+        <div style={{
+          marginTop: 0,
+          paddingTop: 14,
+          borderTop: "none",
+        }}>
+          {messages.length > 0 && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 12,
+              paddingBottom: 8,
+            }}>
+              <div style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                background: `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 9,
+                color: "#fff",
+                fontWeight: 800,
+                flexShrink: 0,
+              }}>
+                ✦
+              </div>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: SUNWAY_RED,
+              }}>
+                Form / Details
+              </span>
+            </div>
+          )}
+          <VisualPanel onQuery={onQuery} />
+        </div>
+      )}
+
+      {/* Scroll anchor */}
+      <div ref={endRef} style={{ height: 1, marginTop: 12 }} />
     </>
   );
 }
@@ -594,11 +822,14 @@ function MobileMessages({ onQuery }) {
    Mobile Chat Input — clean, full-width
 ───────────────────────────────────────────────────────────────────────── */
 function MobileChatInput({ onSend }) {
-  const { isLoading, isListening, isMuted, suggestions, setIsListening, setIsMuted, setAvatarState } = useAssistantStore();
+  const { isLoading, isListening, suggestions, setIsListening, setAvatarState } = useAssistantStore();
   const [input, setInput] = useState("");
   const [transcript, setTr] = useState("");
   const [countdown, setCountdown] = useState(20);
   const countdownRef = useRef(null);
+  // See ChatInput — keeps voice submits out of the setState updater
+  const transcriptRef = useRef("");
+  const setTranscript = useCallback((t) => { transcriptRef.current = t; setTr(t); }, []);
 
   useEffect(() => {
     if (isListening) {
@@ -620,36 +851,42 @@ function MobileChatInput({ onSend }) {
     const t = input.trim(); if (!t || isLoading) return;
     setInput(""); onSend(t);
   };
-  const onKey = e => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
+  const onKey = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } };
 
   const toggleMic = () => {
     if (!isSupported()) return;
-    
+
     // 🛑 INTERRUPT: Stop any ongoing speech when mic is clicked
     stopSpeaking();
     console.log('[MIC-MOBILE] 🛑 Stopping speech to listen');
-    
+
     if (isListening) {
-      // User clicked stop — submit whatever was heard
-      _stopListening();
+      // User clicked stop. finishListening() still sends the recorded audio to
+      // Whisper, and the transcript comes back through onEnd below — so don't
+      // submit here or the message would be sent twice.
       setIsListening(false);
       setAvatarState("idle");
-      if (transcript.trim()) { onSend(transcript); setTr(""); }
+      _finishListening();
       return;
     }
-    setTr("");
+    setTranscript("");
     setIsListening(true);
     setAvatarState("listening");
     _startListening({
+      lang: useAssistantStore.getState().sttLang,
       onResult: (text) => {
-        setTr(text); // just update display; user clicks stop to submit
+        setTranscript(text); // just update display; user clicks stop to submit
       },
-      onError: () => { setIsListening(false); setAvatarState("idle"); setTr(""); },
-      onEnd: () => {
-        // Timeout fired (20s) — auto-submit if there's text
+      onError: () => { setIsListening(false); setAvatarState("idle"); setTranscript(""); },
+      onEnd: (finalText) => {
+        // Fires on silence, timeout or the stop button. finalText is Whisper's
+        // transcript when it succeeded; otherwise fall back to what the
+        // browser heard live.
         setIsListening(false);
         setAvatarState("idle");
-        setTr(prev => { if (prev.trim()) onSend(prev); return ""; });
+        const heard = (finalText || transcriptRef.current || "").trim();
+        setTranscript("");
+        if (heard) onSend(heard);
       },
     });
   };
@@ -661,7 +898,7 @@ function MobileChatInput({ onSend }) {
       flexShrink: 0,
       background: "rgba(255,255,255,0.65)",
       backdropFilter: "blur(12px)",
-      borderTop: `1px solid ${SOFT_RED_BORDER}30`,
+      borderTop: `1px solid rgba(var(--brand-rgb), 0.19)`,
       padding: "10px 14px 12px",
     }}>
       {/* Suggestion pills — horizontal scroll */}
@@ -680,6 +917,9 @@ function MobileChatInput({ onSend }) {
           ))}
         </div>
       )}
+
+      {/* Speech language picker */}
+      <div style={{ marginBottom: 7 }}><SpeechLangPicker compact /></div>
 
       {/* Listening status */}
       {isListening && (
@@ -725,7 +965,7 @@ function MobileChatInput({ onSend }) {
           value={isListening ? (transcript || "") : input}
           onChange={e => { if (!isListening) setInput(e.target.value); }}
           onKeyDown={onKey}
-          placeholder="Ask anything..."
+          placeholder="Type your question..."
           disabled={isListening}
           style={{
             flex: 1, background: "none", border: "none", outline: "none",
@@ -739,17 +979,23 @@ function MobileChatInput({ onSend }) {
             background: canSend ? `linear-gradient(135deg, ${SUNWAY_RED}, ${DARK_RED})` : "rgba(0,0,0,0.15)",
             cursor: canSend ? "pointer" : "not-allowed",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: canSend ? `0 3px 10px ${SUNWAY_RED}40` : "none",
+            boxShadow: canSend ? `0 3px 10px rgba(var(--brand-rgb), 0.25)` : "none",
           }}>
           <Send size={15} color={canSend ? "#fff" : "#aaa"} />
         </button>
       </div>
 
-      {/* Footer */}
+      {/* Footer with RGB border effect */}
       <div style={{
-        textAlign: "center", marginTop: 7, fontSize: 10.5,
+        margin: "7px auto 0",
+        textAlign: "center", fontSize: 10.5,
         color: SECONDARY_TEXT,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 5
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+        background: "rgba(255,255,255,0.9)",
+        borderRadius: "14px", padding: "4px 12px",
+        border: "2px solid #ff0000",
+        animation: "rgbBorder 3s linear infinite",
+        width: "fit-content",
       }}>
         Powered By
         <img
@@ -767,14 +1013,99 @@ function MobileChatInput({ onSend }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Widget Mode Components
+───────────────────────────────────────────────────────────────────────── */
+function MinimizedButton({ onClick }) {
+  return (
+    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 10000, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+      <div style={{
+        background: "#fff", padding: "8px 16px", borderRadius: 20,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 13, fontWeight: 700, color: "#333",
+        animation: "slideUp 0.3s ease",
+      }}>
+        Hi! 👋 Chat with me
+      </div>
+      <button onClick={onClick} style={{
+        width: 60, height: 60, borderRadius: "50%",
+        background: SUNWAY_RED, border: "none", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 6px 16px rgba(181,31,36,0.3)",
+        animation: "pulse 2s infinite"
+      }}>
+        <MessageCircle size={28} color="#fff" />
+      </button>
+    </div>
+  );
+}
+
+function WidgetTopBar({ onMinimize, onMaximize }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "12px 16px", background: "#fff", borderBottom: "1px solid #f0f0f0",
+      flexShrink: 0
+    }}>
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>{getCollegeConfig().assistantName}</div>
+        <div style={{ fontSize: 12, color: "#10b981", display: "flex", alignItems: "center", gap: 5, marginTop: 2, fontWeight: 500 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} /> Online
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={onMinimize} style={{ width: 32, height: 32, borderRadius: 8, background: "#f5f5f5", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Minus size={16} color="#555" />
+        </button>
+        <button onClick={onMaximize} style={{ width: 32, height: 32, borderRadius: 8, background: "#f5f5f5", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Square size={14} color="#555" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WidgetView({ onMinimize, onMaximize, onQuery }) {
+  return (
+    <div style={{
+      position: "fixed", bottom: 20, right: 20,
+      width: 380, height: 720, maxHeight: "calc(100vh - 40px)",
+      background: "#fff", borderRadius: 16,
+      boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+      display: "flex", flexDirection: "column",
+      overflow: "hidden", zIndex: 10000,
+      fontFamily: "'Inter', system-ui, sans-serif"
+    }}>
+      <WidgetTopBar onMinimize={onMinimize} onMaximize={onMaximize} />
+
+      {/* Avatar Section */}
+      <div style={{ position: "relative", height: 260, backgroundImage: `url('${getCollegeConfig().pageBackground || "/full-bg.jpg"}')`, backgroundSize: "cover", backgroundPosition: "top center", flexShrink: 0 }}>
+        <AvatarScene portrait={true} />
+      </div>
+
+      {/* Chat Section */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "#fff" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px", minHeight: 0 }}>
+          <MobileMessages onQuery={onQuery} />
+        </div>
+        <MobileChatInput onSend={onQuery} />
+      </div>
+    </div>
+  );
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
    Root App
 ───────────────────────────────────────────────────────────────────────── */
 function CollegeAssistant() {
   const { setVisualAction } = useAssistantStore();
   const { sendChat } = useChat();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [displayMode, setDisplayMode] = useState("minimized"); // "minimized", "widget", "fullscreen"
 
-  useWelcomeGreeting();
+  // Only trigger the welcome greeting when the assistant is actually on screen.
+  // Mobile skips the minimized/widget modes entirely and renders the full UI,
+  // so the greeting must fire there regardless of displayMode.
+  useWelcomeGreeting(isMobile || displayMode !== "minimized");
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth < 768);
@@ -783,8 +1114,20 @@ function CollegeAssistant() {
   }, []);
 
   const handleQuery = useCallback((q) => sendChat(q), [sendChat]);
-  const handleHome  = () => setVisualAction({ type: "SHOW_HOME", resourceId: "", title: "" });
+  const handleHome = () => setVisualAction({ type: "SHOW_HOME", resourceId: "", title: "" });
   const handleReset = () => useAssistantStore.getState().clearConversation();
+
+  const basePageBackground = (
+    <div style={{
+      position: "fixed", inset: 0,
+      backgroundImage: `url('${getCollegeConfig().pageBackground || "/full-bg.jpg"}')`,
+      backgroundSize: "cover",
+      backgroundPosition: "center center",
+      backgroundRepeat: "no-repeat",
+      fontFamily: "'Inter', system-ui, sans-serif",
+      zIndex: 0
+    }} />
+  );
 
   /* ── Mobile ── */
   if (isMobile) {
@@ -792,7 +1135,7 @@ function CollegeAssistant() {
       <div style={{
         display: "flex", flexDirection: "column",
         height: "100dvh", overflow: "hidden",
-        backgroundImage: "url('/full-bg.jpg')",
+        backgroundImage: `url('${getCollegeConfig().pageBackground || "/full-bg.jpg"}')`,
         backgroundSize: "cover",
         backgroundPosition: "center center",
         backgroundRepeat: "no-repeat",
@@ -807,16 +1150,19 @@ function CollegeAssistant() {
           display: "flex", alignItems: "center",
           padding: "0 14px", gap: 10,
         }}>
-          <img src="https://media.edusanjal.com/__sized__/logos/sunway_lolo-thumbnail-200x200-70.jpg"
-            alt="Sunway" style={{ width: 30, height: 30, borderRadius: 7, objectFit: "cover" }} />
+          <img
+            src={getCollegeConfig().logoUrl || "/my-logo.png"}
+            alt={getCollegeConfig().shortName}
+            style={{ width: 30, height: 30, objectFit: "contain", background: "transparent" }}
+          />
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: "#111", lineHeight: 1 }}>Sunway College</div>
-            <div style={{ fontSize: 10, color: "#888" }}>AI Admission Assistant</div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: "#111", lineHeight: 1 }}>{getCollegeConfig().shortName}</div>
+            <div style={{ fontSize: 10, color: "#888" }}>{getCollegeConfig().assistantName}</div>
           </div>
           <StatusBadgeMobile />
           <button onClick={handleReset} style={{
-            background: `${SUNWAY_RED}10`,
-            border: `1px solid ${SUNWAY_RED}30`,
+            background: `rgba(var(--brand-rgb), 0.06)`,
+            border: `1px solid rgba(var(--brand-rgb), 0.19)`,
             borderRadius: 8,
             padding: "6px 12px",
             fontSize: 11.5,
@@ -826,40 +1172,60 @@ function CollegeAssistant() {
           }}>Reset</button>
         </div>
 
-        {/* Avatar — compact strip */}
         <div style={{ height: 180, flexShrink: 0, position: "relative" }}>
-          <AvatarScene />
+          <AvatarScene portrait={true} />
         </div>
 
-        {/* Visual + Chat — takes remaining space */}
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          {/* Scrollable messages + visual panel */}
           <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px 6px", minHeight: 0 }}>
             <MobileMessages onQuery={handleQuery} />
           </div>
-
-          {/* Chat input — pinned to bottom */}
           <MobileChatInput onSend={handleQuery} />
         </div>
       </div>
     );
   }
 
-  /* ── Desktop ── */
+  /* ── Desktop - Minimized ── */
+  if (displayMode === "minimized") {
+    return (
+      <>
+        {basePageBackground}
+        <MinimizedButton onClick={() => setDisplayMode("widget")} />
+      </>
+    );
+  }
+
+  /* ── Desktop - Widget ── */
+  if (displayMode === "widget") {
+    return (
+      <>
+        {basePageBackground}
+        <WidgetView
+          onMinimize={() => setDisplayMode("minimized")}
+          onMaximize={() => setDisplayMode("fullscreen")}
+          onQuery={handleQuery}
+        />
+      </>
+    );
+  }
+
+  /* ── Desktop - Fullscreen ── */
   return (
     <div style={{
       display: "flex", flexDirection: "column",
       height: "100dvh", overflow: "hidden",
-      backgroundImage: "url('/full-bg.jpg')",
-      backgroundSize: "cover",
-      backgroundPosition: "center center",
-      backgroundRepeat: "no-repeat",
+      background: "linear-gradient(135deg, #FAFAFA 0%, #FFFFFF 100%)",
       fontFamily: "'Inter', system-ui, sans-serif",
+      position: "relative"
     }}>
-      <TopBar onHome={handleHome} onReset={handleReset} />
+      {/* Background decorative elements */}
+      <div style={{ position: "absolute", top: 0, right: 0, width: 800, height: 800, background: `radial-gradient(circle, ${VERY_LIGHT_RED} 0%, transparent 70%)`, opacity: 0.8, zIndex: 0 }} />
 
-      <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
-        <LeftPanel onQuery={handleQuery} />
+      <TopBar onHome={handleHome} onReset={handleReset} onBackToWidget={() => setDisplayMode("widget")} />
+
+      <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10 }}>
+        <LeftPanel />
         <RightPanel onQuery={handleQuery} />
       </div>
     </div>

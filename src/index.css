@@ -37,6 +37,19 @@ img { -webkit-user-drag: none; user-select: none; }
 @keyframes fadeIn {
   from { opacity: 0; } to { opacity: 1; }
 }
+@keyframes spinGradient {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes rgbBorder {
+  0%   { border-color: #ff0000; }
+  16%  { border-color: #ffff00; }
+  33%  { border-color: #00ff00; }
+  50%  { border-color: #00ffff; }
+  66%  { border-color: #0000ff; }
+  83%  { border-color: #ff00ff; }
+  100% { border-color: #ff0000; }
+}
 
 /* Premium focus states with Sunway red */
 input:focus, textarea:focus, select:focus {

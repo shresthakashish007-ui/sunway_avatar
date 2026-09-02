@@ -57,14 +57,14 @@ Rotation System: INSTALLED AND READY ✅
 
 ### Your 8 API Keys
 ```
-Key 1: gsk_REDACTED_API_KEY
-Key 2: gsk_REDACTED_API_KEY
-Key 3: gsk_REDACTED_API_KEY
-Key 4: gsk_REDACTED_API_KEY
-Key 5: gsk_REDACTED_API_KEY
-Key 6: gsk_REDACTED_API_KEY
-Key 7: gsk_REDACTED_API_KEY
-Key 8: gsk_REDACTED_API_KEY
+Key 1: gsk_REDACTED
+Key 2: gsk_REDACTED
+Key 3: gsk_REDACTED
+Key 4: gsk_REDACTED
+Key 5: gsk_REDACTED
+Key 6: gsk_REDACTED
+Key 7: gsk_REDACTED
+Key 8: gsk_REDACTED
 ```
 
 All 8 keys are loaded and ready for rotation!
@@ -127,7 +127,7 @@ recordSuccess()  recordFailure()
 ## 📊 Admin Dashboard
 
 Access at: **http://localhost:3001/groq-keys-dashboard.html**  
-Password: **admin123**
+Password: **your_secure_password_here**
 
 ### Features:
 - ✅ Real-time key status (active/exhausted/error)
@@ -254,7 +254,7 @@ You should see all green checkmarks (✅).
 ### Server Logs Will Show:
 ```
 ✅ Loaded 8 Groq API keys for rotation
-🔑 Using Groq key 1/8: gsk_REDACTED_API_KEY...9xn
+🔑 Using Groq key 1/8: gsk_G2XH...9xn
 [CHAT] Processing message: "Hello..."
 ```
 
@@ -262,7 +262,7 @@ When rate limit hits:
 ```
 🚫 Rate limit hit on key 1. Rotating to next key...
 🔄 Rotated from key 0 to key 1
-🔑 Using Groq key 2/8: gsk_REDACTED_API_KEY...eVi7
+🔑 Using Groq key 2/8: gsk_2kvL...eVi7
 ```
 
 ## 📈 Why This WILL Work in the Future
@@ -318,7 +318,7 @@ When rate limit hits:
 | What | Where |
 |------|-------|
 | Dashboard | http://localhost:3001/groq-keys-dashboard.html |
-| Password | admin123 |
+| Password | your_secure_password_here |
 | Documentation | GROQ-KEY-ROTATION.md |
 | Verification | `.\verify-rotation.ps1` |
 | Server Start | `npm start` |
@@ -330,4 +330,3 @@ When rate limit hits:
 3. System handles everything automatically
 4. Check dashboard occasionally to monitor stats
 5. Relax knowing rate limits are handled! 🎉
-

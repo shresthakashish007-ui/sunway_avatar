@@ -2,14 +2,25 @@ import { Canvas } from "@react-three/fiber";
 import { ContactShadows } from "@react-three/drei";
 import React, { Suspense } from "react";
 import { AvatarController } from "./AvatarController";
+import { SpeakingIndicator } from "./SpeakingIndicator";
+import { useAssistantStore } from "../../store/assistantStore";
+import { getCollegeConfig } from "../../services/collegeConfig";
 
-export function AvatarScene() {
+export function AvatarScene({ portrait = false }) {
+  const { avatarState } = useAssistantStore();
+
+  // Portrait mode: zoom camera into head+chest (used on mobile)
+  // Standard mode: full body view (desktop)
+  const camera = portrait
+    ? { position: [0, 0.3, 2.8], fov: 36 }
+    : { position: [0, 0.35, 5.2], fov: 42 };
+
   return (
     <div style={{
       position: "relative", width: "100%", height: "100%",
       overflow: "hidden",
       /* Avatar background image */
-      backgroundImage: "url('/img/avatar_background/Background_Img_3D.png')",
+      backgroundImage: `url('${getCollegeConfig().avatarBackground || "/img/avatar_background/Background_Img_3D.png"}')`,
       backgroundSize: "cover",
       backgroundPosition: "center top",
       backgroundRepeat: "no-repeat",
@@ -23,7 +34,7 @@ export function AvatarScene() {
 
       <Canvas
         shadows
-        camera={{ position: [0, 0.35, 5.2], fov: 42 }}
+        camera={camera}
         style={{ position: "absolute", inset: 0, background: "transparent" }}
         gl={{ alpha: true, antialias: true }}
       >
@@ -35,12 +46,18 @@ export function AvatarScene() {
 
         <Suspense fallback={null}>
           <AvatarController position={[0, -2.9, 0]} scale={2} />
-          <ContactShadows
-            position={[0, -2.95, 0]}
-            opacity={0.12} scale={5} blur={2} far={4}
-          />
+          {/* Only show ground shadow on desktop full-body view */}
+          {!portrait && (
+            <ContactShadows
+              position={[0, -2.95, 0]}
+              opacity={0.12} scale={5} blur={2} far={4}
+            />
+          )}
         </Suspense>
       </Canvas>
+
+      {/* Speaking Indicator - HTML overlay */}
+      <SpeakingIndicator isVisible={avatarState === "talking"} />
     </div>
   );
 }
