@@ -39,7 +39,7 @@ You should see:
 ### Open Dashboard
 1. Start server (see above)
 2. Visit: **http://localhost:3001/groq-keys-dashboard.html**
-3. Login with password: `admin123` (from your .env)
+3. Login with password: `your_secure_password_here` (from your .env)
 4. See real-time status of all 8 keys!
 
 ### Dashboard Shows:
@@ -84,14 +84,14 @@ Invoke-RestMethod -Uri "http://localhost:3001/api/chat" -Method POST -Body $body
 
 ### Check Key Status
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=admin123"
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=your_secure_password_here"
 ```
 
 ## 🎛️ Admin Controls
 
 ### Via Dashboard (Easy Way)
 1. Go to: http://localhost:3001/groq-keys-dashboard.html
-2. Login with `admin123`
+2. Login with `your_secure_password_here`
 3. Click buttons to:
    - Reset individual keys
    - Reset all keys
@@ -101,13 +101,13 @@ Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=admin123
 ### Via API (Advanced)
 ```powershell
 # Reset key 1
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset/0?token=admin123" -Method POST
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset/0?token=your_secure_password_here" -Method POST
 
 # Reset all keys
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset-all?token=admin123" -Method POST
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset-all?token=your_secure_password_here" -Method POST
 
 # Switch to key 5
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/set-current/4?token=admin123" -Method POST
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/set-current/4?token=your_secure_password_here" -Method POST
 ```
 
 ## 📝 Configuration
@@ -153,7 +153,7 @@ Watch for rotation events:
 
 ### Dashboard won't login
 - **Check**: ADMIN_PASSWORD in .env matches what you're typing
-- **Default**: `admin123`
+- **Default**: `your_secure_password_here`
 
 ## 📚 Full Documentation
 

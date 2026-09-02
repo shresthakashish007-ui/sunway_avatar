@@ -1,0 +1,19 @@
+{
+  "slug": "sunway",
+  "name": "Sunway College Kathmandu",
+  "shortName": "Sunway",
+  "tagline": "Creating AI Leaders",
+  "assistantName": "Sunway Guide",
+  "builtBy": "Pranam Software — Nepal-based AI company.",
+  "brandColor": "#B51F24",
+  "brandColorDark": "#8F171B",
+  "logoUrl": "https://sunway.edu.np/wp-content/uploads/2025/04/a4-top-logo.png.webp",
+  "buildingImage": "/sunway-building.png",
+  "applyUrl": "https://sunway.edu.np/apply",
+  "virtualTourUrl": "https://virtualtour.thebritishcollege.edu.np",
+  "website": "https://sunway.edu.np",
+  "pageBackground": "/full-bg.jpg",
+  "avatarBackground": "/img/avatar_background/Background_Img_3D.png",
+  "greetingText": "नमस्ते! सनवे कलेजमा स्वागत छ। मैले हजुरलाई के सहयोग गर्न सक्छु?",
+  "greetingLang": "ne"
+}

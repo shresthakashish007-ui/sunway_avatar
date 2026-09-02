@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microsoft Edge TTS Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            color: #333;
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            box-sizing: border-box;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+        .speak-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .speak-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .stop-btn {
+            background: #e74c3c;
+            color: white;
+        }
+        .stop-btn:hover {
+            background: #c0392b;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+            background: white;
+        }
+        .voice-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .voice-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        .voice-item.microsoft {
+            border-left-color: #00a4ef;
+            background: #e6f7ff;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #bee5eb;
+        }
+        .highlight {
+            color: #667eea;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Microsoft Edge TTS Test</h1>
+        <p class="subtitle">Test high-quality text-to-speech with Microsoft Edge voices</p>
+        
+        <div id="status" class="status info">
+            Loading voices...
+        </div>
+
+        <label for="text"><strong>Text to Speak:</strong></label>
+        <textarea id="text" placeholder="Enter text to speak...">
+Hello! I am using Microsoft Edge TTS. This is a free, high-quality text-to-speech service built into your browser. For the best experience, please use Microsoft Edge browser.
+
+नमस्ते! म Microsoft Edge TTS प्रयोग गरिरहेको छु। यो तपाईंको ब्राउजरमा निःशुल्क उपलब्ध छ।
+
+हैलो! मैं Microsoft Edge TTS का उपयोग कर रहा हूं। यह बिल्कुल मुफ्त है।
+        </textarea>
+
+        <label for="voiceSelect"><strong>Select Voice:</strong></label>
+        <select id="voiceSelect"></select>
+
+        <div class="controls">
+            <button class="speak-btn" onclick="testSpeak()">🎤 Speak</button>
+            <button class="stop-btn" onclick="stopSpeak()">🛑 Stop</button>
+        </div>
+
+        <h3>📋 Available Voices:</h3>
+        <div id="voiceList" class="voice-list"></div>
+    </div>
+
+    <script>
+        let voices = [];
+        let selectedVoice = null;
+
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+            
+            if (voices.length === 0) {
+                setTimeout(loadVoices, 100);
+                return;
+            }
+
+            console.log(`Loaded ${voices.length} voices`);
+
+            // Sort voices - Microsoft first, then others
+            voices.sort((a, b) => {
+                if (a.name.includes('Microsoft') && !b.name.includes('Microsoft')) return -1;
+                if (!a.name.includes('Microsoft') && b.name.includes('Microsoft')) return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            // Update select dropdown
+            const select = document.getElementById('voiceSelect');
+            select.innerHTML = '';
+            voices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})${voice.localService ? ' - Local' : ''}`;
+                select.appendChild(option);
+            });
+
+            // Update voice list display
+            const listDiv = document.getElementById('voiceList');
+            listDiv.innerHTML = '';
+            
+            const microsoftVoices = voices.filter(v => v.name.includes('Microsoft'));
+            const otherVoices = voices.filter(v => !v.name.includes('Microsoft'));
+
+            if (microsoftVoices.length > 0) {
+                listDiv.innerHTML += `<h4 style="color: #00a4ef; margin-top: 0;">🎯 Microsoft Edge Voices (${microsoftVoices.length})</h4>`;
+                microsoftVoices.forEach(voice => {
+                    listDiv.innerHTML += `
+                        <div class="voice-item microsoft">
+                            <strong>${voice.name}</strong><br>
+                            Language: ${voice.lang} | Local: ${voice.localService ? '✅' : '❌'}
+                        </div>
+                    `;
+                });
+            }
+
+            if (otherVoices.length > 0) {
+                listDiv.innerHTML += `<h4 style="margin-top: 20px;">🌐 Other Voices (${otherVoices.length})</h4>`;
+                otherVoices.forEach(voice => {
+                    listDiv.innerHTML += `
+                        <div class="voice-item">
+                            <strong>${voice.name}</strong><br>
+                            Language: ${voice.lang} | Local: ${voice.localService ? '✅' : '❌'}
+                        </div>
+                    `;
+                });
+            }
+
+            // Update status
+            const status = document.getElementById('status');
+            const msCount = microsoftVoices.length;
+            if (msCount > 0) {
+                status.className = 'status success';
+                status.innerHTML = `✅ Found <span class="highlight">${msCount}</span> Microsoft Edge voices! Total: ${voices.length} voices available.`;
+            } else {
+                status.className = 'status info';
+                status.innerHTML = `⚠️ No Microsoft voices found. Try using Microsoft Edge browser for best quality. Found ${voices.length} voices.`;
+            }
+        }
+
+        function testSpeak() {
+            const text = document.getElementById('text').value;
+            const select = document.getElementById('voiceSelect');
+            const voiceIndex = select.value;
+            
+            if (!text.trim()) {
+                alert('Please enter some text to speak');
+                return;
+            }
+
+            stopSpeak();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.voice = voices[voiceIndex];
+            utterance.rate = 1.05;
+            utterance.pitch = 1.15;
+            utterance.volume = 1;
+
+            utterance.onstart = () => {
+                console.log('🎙️ Speech started with:', utterance.voice.name);
+                document.getElementById('status').innerHTML = '🎙️ Speaking...';
+            };
+
+            utterance.onend = () => {
+                console.log('✅ Speech completed');
+                loadVoices(); // Refresh status
+            };
+
+            utterance.onerror = (e) => {
+                console.error('❌ Speech error:', e);
+                document.getElementById('status').innerHTML = `❌ Error: ${e.error}`;
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function stopSpeak() {
+            window.speechSynthesis.cancel();
+        }
+
+        // Load voices when page loads
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+    </script>
+</body>
+</html>

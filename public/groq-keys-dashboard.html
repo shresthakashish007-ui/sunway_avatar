@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Groq API Keys Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .login-box {
+      background: white;
+      border-radius: 10px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .login-box input {
+      width: 100%;
+      max-width: 300px;
+      padding: 12px 20px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    
+    .login-box button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 40px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .login-box button:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+    }
+    
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .summary-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .summary-card h3 {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    
+    .summary-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .summary-card.active .value { color: #10b981; }
+    .summary-card.exhausted .value { color: #ef4444; }
+    .summary-card.error .value { color: #f59e0b; }
+    
+    .keys-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 15px;
+    }
+    
+    .key-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      position: relative;
+      border: 3px solid transparent;
+      transition: all 0.3s;
+    }
+    
+    .key-card.current {
+      border-color: #667eea;
+      box-shadow: 0 5px 20px rgba(102,126,234,0.3);
+    }
+    
+    .key-card.active { border-left: 5px solid #10b981; }
+    .key-card.exhausted { border-left: 5px solid #ef4444; }
+    .key-card.error { border-left: 5px solid #f59e0b; }
+    
+    .key-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .key-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .status-badge {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    
+    .status-badge.active { background: #d1fae5; color: #065f46; }
+    .status-badge.exhausted { background: #fee2e2; color: #991b1b; }
+    .status-badge.error { background: #fef3c7; color: #92400e; }
+    .status-badge.cooldown { background: #dbeafe; color: #1e40af; }
+    
+    .key-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .stat {
+      font-size: 13px;
+      color: #666;
+    }
+    
+    .stat strong {
+      color: #333;
+      display: block;
+      font-size: 16px;
+    }
+    
+    .key-info {
+      font-size: 12px;
+      color: #999;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #eee;
+    }
+    
+    .key-preview {
+      font-family: monospace;
+      font-size: 11px;
+      background: #f3f4f6;
+      padding: 5px 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s;
+      flex: 1;
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+    
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #333;
+    }
+    
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    
+    .global-actions {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .global-actions button {
+      margin: 0 10px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: white;
+      font-size: 18px;
+    }
+    
+    .error-message {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .cooldown-timer {
+      font-size: 12px;
+      color: #1e40af;
+      margin-top: 5px;
+    }
+    
+    .current-badge {
+      position: absolute;
+      top: -10px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: bold;
+      box-shadow: 0 3px 10px rgba(102,126,234,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔑 Groq API Keys Dashboard</h1>
+      <p>Monitor and manage automatic API key rotation</p>
+    </div>
+    
+    <div id="loginBox" class="login-box">
+      <h2>Admin Login Required</h2>
+      <p style="margin: 20px 0; color: #666;">Enter admin password to access dashboard</p>
+      <input type="password" id="passwordInput" placeholder="Admin Password" />
+      <button onclick="login()">Login</button>
+      <div id="loginError" style="color: #ef4444; margin-top: 10px;"></div>
+    </div>
+    
+    <div id="dashboard" style="display: none;">
+      <div id="error" class="error-message" style="display: none;"></div>
+      
+      <div class="summary" id="summary"></div>
+      
+      <div class="keys-grid" id="keysGrid"></div>
+      
+      <div class="global-actions">
+        <h3 style="margin-bottom: 15px;">Global Actions</h3>
+        <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
+        <button class="btn btn-secondary" onclick="resetAllKeys()">♻️ Reset All Keys</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let adminToken = '';
+    const API_BASE = window.location.origin;
+    
+    function login() {
+      const password = document.getElementById('passwordInput').value;
+      if (!password) {
+        document.getElementById('loginError').textContent = 'Please enter password';
+        return;
+      }
+      
+      adminToken = password;
+      fetchKeyData();
+    }
+    
+    async function fetchKeyData() {
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/groq-keys?token=${adminToken}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          if (response.status === 401) {
+            document.getElementById('loginError').textContent = 'Invalid password';
+            adminToken = '';
+            return;
+          }
+          showError(data.error || 'Failed to fetch key data');
+          return;
+        }
+        
+        // Login successful
+        document.getElementById('loginBox').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        
+        renderDashboard(data);
+      } catch (err) {
+        console.error('Error:', err);
+        showError('Failed to connect to server');
+      }
+    }
+    
+    function renderDashboard(data) {
+      document.getElementById('error').style.display = 'none';
+      
+      // Render summary
+      const summary = data.summary;
+      document.getElementById('summary').innerHTML = `
+        <div class="summary-card">
+          <h3>Total Keys</h3>
+          <div class="value">${data.totalKeys}</div>
+        </div>
+        <div class="summary-card active">
+          <h3>Active Keys</h3>
+          <div class="value">${summary.activeKeys}</div>
+        </div>
+        <div class="summary-card exhausted">
+          <h3>Exhausted Keys</h3>
+          <div class="value">${summary.exhaustedKeys}</div>
+        </div>
+        <div class="summary-card error">
+          <h3>Error Keys</h3>
+          <div class="value">${summary.errorKeys}</div>
+        </div>
+        <div class="summary-card">
+          <h3>Total Requests</h3>
+          <div class="value">${summary.totalRequests}</div>
+        </div>
+        <div class="summary-card">
+          <h3>Success Rate</h3>
+          <div class="value">${summary.totalRequests > 0 ? Math.round((summary.totalSuccesses / summary.totalRequests) * 100) : 0}%</div>
+        </div>
+        <div class="summary-card">
+          <h3>Rate Limit Hits</h3>
+          <div class="value">${summary.totalRateLimitHits}</div>
+        </div>
+      `;
+      
+      // Render keys
+      const keysHTML = data.stats.map(key => {
+        const cooldown = formatCooldown(key.cooldownRemaining);
+        const successRate = key.totalRequests > 0 
+          ? Math.round((key.successfulRequests / key.totalRequests) * 100) 
+          : 0;
+        
+        return `
+          <div class="key-card ${key.status} ${key.isCurrent ? 'current' : ''}">
+            ${key.isCurrent ? '<div class="current-badge">CURRENT</div>' : ''}
+            <div class="key-header">
+              <div class="key-title">Key ${key.keyIndex + 1}</div>
+              <span class="status-badge ${key.status}">${key.status}</span>
+            </div>
+            <div class="key-preview">${key.keyPreview}</div>
+            <div class="key-stats">
+              <div class="stat">
+                <strong>${key.totalRequests}</strong>
+                Total Requests
+              </div>
+              <div class="stat">
+                <strong>${successRate}%</strong>
+                Success Rate
+              </div>
+              <div class="stat">
+                <strong>${key.rateLimitHits}</strong>
+                Rate Limit Hits
+              </div>
+              <div class="stat">
+                <strong>${key.consecutiveErrors}</strong>
+                Consecutive Errors
+              </div>
+            </div>
+            ${key.cooldownRemaining > 0 ? `<div class="cooldown-timer">⏱️ Cooldown: ${cooldown}</div>` : ''}
+            ${key.lastError ? `<div class="key-info">Last Error: ${key.lastError.message.slice(0, 50)}...</div>` : ''}
+            ${key.lastUsed ? `<div class="key-info">Last Used: ${new Date(key.lastUsed).toLocaleString()}</div>` : ''}
+            <div class="actions">
+              <button class="btn btn-secondary" onclick="resetKey(${key.keyIndex})">Reset</button>
+              <button class="btn btn-primary" onclick="setCurrentKey(${key.keyIndex})">Use This</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      document.getElementById('keysGrid').innerHTML = keysHTML;
+    }
+    
+    function formatCooldown(ms) {
+      if (ms <= 0) return 'None';
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      return `${minutes}m ${seconds}s`;
+    }
+    
+    async function resetKey(keyIndex) {
+      if (!confirm(`Reset key ${keyIndex + 1}?`)) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/groq-keys/reset/${keyIndex}?token=${adminToken}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(data.message);
+          fetchKeyData();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Failed to reset key');
+      }
+    }
+    
+    async function setCurrentKey(keyIndex) {
+      if (!confirm(`Set key ${keyIndex + 1} as current active key?`)) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/groq-keys/set-current/${keyIndex}?token=${adminToken}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(data.message);
+          fetchKeyData();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Failed to set current key');
+      }
+    }
+    
+    async function resetAllKeys() {
+      if (!confirm('Reset ALL keys? This will clear all cooldowns and error states.')) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/groq-keys/reset-all?token=${adminToken}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(data.message);
+          fetchKeyData();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Failed to reset all keys');
+      }
+    }
+    
+    function refreshData() {
+      fetchKeyData();
+    }
+    
+    function showError(message) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+    
+    // Auto refresh every 10 seconds when logged in
+    setInterval(() => {
+      if (adminToken && document.getElementById('dashboard').style.display !== 'none') {
+        fetchKeyData();
+      }
+    }, 10000);
+  </script>
+</body>
+</html>

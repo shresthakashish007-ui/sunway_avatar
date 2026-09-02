@@ -1,13 +1,22 @@
 import express from "express";
-import collegeData, { leadsStore } from "../database/collegeData.js";
+import db, { leadsStore } from "../database/sunwayData.js";
 import keyRotation from "../services/groqKeyRotation.js";
 
 const router = express.Router();
 
 // Simple admin auth middleware
 function adminAuth(req, res, next) {
+  const expected = process.env.ADMIN_PASSWORD;
+
+  // Without a configured password every request would otherwise match
+  // `undefined === undefined` and sail straight through.
+  if (!expected) {
+    console.warn("🔒 /api/admin blocked: ADMIN_PASSWORD is not set in .env");
+    return res.status(503).json({ success: false, error: "Admin API is disabled (ADMIN_PASSWORD not configured)" });
+  }
+
   const token = req.headers["x-admin-token"] || req.query.token;
-  if (token !== process.env.ADMIN_PASSWORD) {
+  if (typeof token !== "string" || token !== expected) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
   next();
@@ -20,16 +29,38 @@ router.get("/leads", adminAuth, (req, res) => {
 
 // GET college info
 router.get("/college", adminAuth, (req, res) => {
-  res.json({ success: true, data: collegeData });
+  res.json({ success: true, data: db });
 });
 
 // UPDATE college basic info (runtime only — for persistent, write to DB)
 router.patch("/college", adminAuth, (req, res) => {
-  const allowed = ["name","description","phone","email","address","tagline"];
-  allowed.forEach(k => {
-    if (req.body[k]) collegeData.college[k] = String(req.body[k]).slice(0, 300);
+  // Maps each editable field onto its actual location in the college record.
+  // Previously every key was written to college[k], so phone/email/address
+  // landed on the top level where nothing reads them.
+  const targets = {
+    name:        () => db.college,
+    description: () => db.college,
+    tagline:     () => db.college,
+    email:       () => db.college.contact,
+    address:     () => db.college.location,
+  };
+
+  const updated = [];
+  Object.entries(targets).forEach(([k, resolve]) => {
+    if (typeof req.body[k] === "string" && req.body[k].trim()) {
+      resolve()[k] = req.body[k].trim().slice(0, 300);
+      updated.push(k);
+    }
   });
-  res.json({ success: true, message: "College info updated (runtime)" });
+
+  // Phones are an array on the contact record
+  if (typeof req.body.phone === "string" && req.body.phone.trim()) {
+    db.college.contact.phones = req.body.phone
+      .split(",").map(p => p.trim().slice(0, 20)).filter(Boolean).slice(0, 5);
+    updated.push("phone");
+  }
+
+  res.json({ success: true, message: "College info updated (runtime)", updated });
 });
 
 // DELETE lead

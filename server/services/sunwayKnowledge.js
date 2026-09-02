@@ -4,6 +4,7 @@
  * Never sends the full database to Groq — only relevant verified facts.
  */
 import db from "../database/sunwayData.js";
+import { searchFaqs, searchDocuments } from "./faqSearch.js";
 
 // ─── Intent / Entity Patterns ────────────────────────────────────────────
 const patterns = [
@@ -35,7 +36,9 @@ const patterns = [
   { intent: "rain",       kw: ["rain","incubation","startup","entrepreneur","research","idea","business idea","khul","innovate"] },
   { intent: "innovation_lab", kw: ["lab","innovation lab","laboratory","facility","facilities","innovation","kolaba"] },
   { intent: "student_life", kw: ["student life","club","ssrc","activities","events","council","social","extracurricular"] },
-  { intent: "virtual_tour", kw: ["360","virtual tour","panorama","campus tour","explore campus","campus dekhna","tour","visit campus","college ghuma","virtual","explore","campus view","3d tour"] },
+  // "ghum" matches ghuma / ghumna / ghumne — the previous "college ghuma"
+  // never fired for the common phrasing "campus ghumna milcha?"
+  { intent: "virtual_tour", kw: ["360","virtual tour","panorama","campus tour","explore campus","campus dekhna","tour","visit campus","ghum","virtual","explore","campus view","3d tour"] },
 
   // Info
   { intent: "contact",    kw: ["contact","phone","number","email","address","kaha","location","where","map","reach","admission office"] },
@@ -47,6 +50,11 @@ const patterns = [
   { intent: "welcome",    kw: ["hello","hi","namaste","namaskar","hey","help","suru","start","yo k ho"] },
 ];
 
+// Program ids that may be used as a lookup key into db.fees / db.modules.
+// sessionContext arrives from the browser, so an unvalidated value could
+// otherwise reach through to Object.prototype keys like "constructor".
+const KNOWN_PROGRAM_IDS = new Set(db.programs.map(p => p.id));
+
 export function detectIntents(message, sessionContext = {}) {
   const lower = message.toLowerCase();
   const intents = new Set();
@@ -54,7 +62,7 @@ export function detectIntents(message, sessionContext = {}) {
     if (p.kw.some(k => lower.includes(k))) intents.add(p.intent);
   }
   // Carry session context
-  if (sessionContext.activeProgram) intents.add(sessionContext.activeProgram);
+  if (KNOWN_PROGRAM_IDS.has(sessionContext?.activeProgram)) intents.add(sessionContext.activeProgram);
   return [...intents];
 }
 
@@ -66,7 +74,72 @@ export function detectProgram(message, sessionContext = {}) {
   if (lower.includes("bit") || lower.includes("business information technology") ||
       lower.includes("business it")) return "bit";
   // Fall back to session
-  return sessionContext.activeProgram || null;
+  const fromSession = sessionContext?.activeProgram;
+  return KNOWN_PROGRAM_IDS.has(fromSession) ? fromSession : null;
+}
+
+/**
+ * Work out which script and language the user actually wrote in.
+ *
+ * Asking the model to "match the user's language" was not reliable — it
+ * answered romanised questions in Devanagari and tagged Hindi as Nepali. This
+ * is decided in code and stated as a hard instruction instead.
+ */
+const HINDI_MARKERS  = ["है", "हैं", "कैसे", "कितनी", "कितना", "क्या", "मिलता", "कीजिए", "करें", "आपका", "हूँ", "नहीं"];
+const NEPALI_MARKERS = ["छ", "छैन", "कसरी", "कति", "गर्नुहोस्", "हो", "पाइन्छ", "तपाईं", "हुन्छ", "लाग्छ"];
+// Latin-script cues. Nepali romanisation vs Hindi romanisation.
+// These are matched as WHOLE WORDS — as substrings, "ho" matches inside "who"
+// and "cha" inside "teacher", which mis-detected plain English questions.
+const ROMAN_NE_MARKERS = [
+  // verbs and verb endings — these are what actually appear in real questions
+  "cha", "chha", "chaina", "chhaina", "paincha", "painchha", "lagcha", "lagchha",
+  "parcha", "parchha", "milcha", "milchha", "huncha", "hunchha", "sakincha",
+  "dinu", "garnu", "hunu", "linu", "aaunu", "janu", "herna", "padhna",
+  "garne", "garna", "chahincha", "chahiyo", "bhaye", "bhanda", "bhanne",
+  // question words and particles
+  "kasari", "kati", "kaile", "kina", "kasto", "kun", "kata", "keho",
+  "ho", "hos", "hola", "ni", "lagi", "ko", "ma", "bata", "sanga",
+  // common nouns that only appear in Nepali phrasing
+  "ghumna", "ghumne", "paisa", "kagajat", "bharna", "padhai",
+];
+const HINGLISH_MARKERS = ["hai", "hain", "kaise", "kaisa", "kitna", "kitni", "kya", "karna", "karein", "sakte", "sakta", "milta", "milti", "chahiye", "bhai", "mein", "aap"];
+
+// Short particles that also occur inside ordinary English sentences, so a
+// single one of them is not evidence of Nepali on its own.
+const WEAK_ROMAN_NE = new Set(["ko", "ho", "cha", "ma", "ni", "kun"]);
+
+function countWordMarkers(text, markers) {
+  const words = new Set(text.toLowerCase().split(/[^a-z]+/).filter(Boolean));
+  let strong = 0, weak = 0;
+  for (const m of markers) {
+    if (words.has(m)) (WEAK_ROMAN_NE.has(m) ? weak++ : strong++);
+  }
+  return { strong, weak };
+}
+
+export function detectUserLanguage(message) {
+  const text = String(message || "");
+  const letters = (text.match(/\p{L}/gu) || []).length || 1;
+  const devanagari = (text.match(/[ऀ-ॿ]/g) || []).length;
+  const isDevanagari = devanagari / letters > 0.25;
+  const lower = text.toLowerCase();
+
+  if (isDevanagari) {
+    const hi = HINDI_MARKERS.filter(w => text.includes(w)).length;
+    const ne = NEPALI_MARKERS.filter(w => text.includes(w)).length;
+    return { script: "Devanagari", language: hi > ne ? "hi" : "ne" };
+  }
+
+  const ne = countWordMarkers(lower, ROMAN_NE_MARKERS);
+  const hi = countWordMarkers(lower, HINGLISH_MARKERS);
+
+  // A lone weak particle ("ko", "ho") is not evidence of Nepali — plain
+  // English questions contain them by accident.
+  const neScore = ne.strong + (ne.strong > 0 ? ne.weak : ne.weak >= 2 ? 1 : 0);
+  const hiScore = hi.strong;
+
+  if (neScore === 0 && hiScore === 0) return { script: "Latin", language: "en" };
+  return { script: "Latin", language: neScore >= hiScore ? "roman_ne" : "hinglish" };
 }
 
 // ─── Build targeted context for Groq ────────────────────────────────────
@@ -272,26 +345,70 @@ export function buildContext(message, conversationHistory = [], sessionContext =
     lines.push(`  Hours: ${c.officeHours}`);
   }
 
-  // Determine active program for session context
-  const newSessionContext = { ...sessionContext };
+  // ─── Matched Q&A from faq.js ──────────────────────────────────────────
+  // Added last so it sits closest to the user's question in the prompt.
+  // This is what makes arbitrary phrasings answerable: the keyword intents
+  // above only fire on exact substrings, whereas the FAQ search scores every
+  // written question and tolerates rewording, synonyms and Romanised Nepali.
+  // 3 rather than 4, and each answer trimmed: prompt size drives prefill
+  // latency, and the 4th match is almost never the one used.
+  const faqHits = searchFaqs(message, { limit: 3 });
+  if (faqHits.length) {
+    lines.push(`\nVERIFIED Q&A — prefer these answers when they fit the question:`);
+    faqHits.forEach(({ entry }) => {
+      lines.push(`  Q: ${entry.q}`);
+      lines.push(`  A: ${entry.a.length > 400 ? entry.a.slice(0, 400) + "..." : entry.a}`);
+    });
+  }
+
+  // Determine active program for session context.
+  // Only the fields we own are echoed back — sessionContext is client-supplied.
+  const newSessionContext = {};
   if (program) newSessionContext.activeProgram = program;
+
+  // Panel suggested by the best-matching FAQ, used only as a fallback when
+  // the model doesn't pick one itself.
+  const topFaq = faqHits[0]?.entry;
+
+  // ─── Passages from uploaded PDFs ──────────────────────────────────────
+  // Added after the Q&A so a hand-written answer always takes precedence;
+  // the PDF is the fallback for things nobody has written a Q&A for yet.
+  const docHits = searchDocuments(message, { limit: 2 });
+  if (docHits.length) {
+    lines.push(`\nFROM UPLOADED COLLEGE DOCUMENTS — quote only what is written here:`);
+    docHits.forEach(h => {
+      const where = h.page ? `${h.title}, page ${h.page}` : h.title;
+      lines.push(`  [${where}] ${h.text}`);
+    });
+  }
+
+  const userLang = detectUserLanguage(message);
 
   return {
     collegeName:     db.college.name,
     contextText:     lines.join("\n"),
+    userLanguage:    userLang,
     detectedIntents: intents,
     detectedProgram: program,
+    faqMatches:      faqHits.map(h => ({ q: h.entry.q, score: Number(h.score.toFixed(2)) })),
+    documentMatches: docHits.map(h => ({ title: h.title, page: h.page, score: Number(h.score.toFixed(2)) })),
+    faqVisual:       topFaq?.visual ? { type: topFaq.visual, resourceId: topFaq.resourceId || "" } : null,
     newSessionContext,
   };
 }
 
 // ─── Resource lookup by type + resourceId ───────────────────────────────
+// resourceId comes straight from the URL, so map lookups go through
+// hasOwnProperty — otherwise "constructor" or "__proto__" resolve to
+// prototype members instead of returning a 404.
+const own = (obj, key) => (typeof key === "string" && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : null);
+
 export function getResource(type, resourceId) {
   switch (type) {
-    case "fees":        return db.fees[resourceId] || null;
+    case "fees":        return own(db.fees, resourceId);
     case "program":     return db.programs.find(p => p.id === resourceId) || null;
     case "programs":    return db.programs;
-    case "modules":     return db.modules[resourceId] || null;
+    case "modules":     return own(db.modules, resourceId);
     case "college":     return db.college;
     case "whySunway":   return db.whySunway;
     case "bcu":         return db.universityPartner;

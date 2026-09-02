@@ -17,6 +17,11 @@ const STATE_FILE = path.join(__dirname, "../data/keyRotationState.json");
 const CONFIG = {
   COOLDOWN_PERIOD: 60 * 60 * 1000, // 1 hour cooldown when key is exhausted
   MAX_ERRORS_BEFORE_SKIP: 3, // Skip key after 3 consecutive errors
+  // How long a key stays benched after consecutive errors. Without this,
+  // consecutiveErrors only ever reset on a success — but a benched key is
+  // never tried again, so it could never succeed and stayed benched forever.
+  // Enough transient errors and the whole pool funnels onto one key.
+  ERROR_BENCH_PERIOD: 5 * 60 * 1000, // 5 minutes
   RATE_LIMIT_KEYWORDS: [
     "rate_limit_exceeded",
     "rate limit",
@@ -32,6 +37,7 @@ class GroqKeyRotation {
     this.currentIndex = 0;
     this.keyStats = new Map();
     this.initialized = false;
+    this._lastLoggedIndex = -1;
   }
 
   /**
@@ -49,22 +55,28 @@ class GroqKeyRotation {
    * Load API keys from environment variable
    */
   loadKeys() {
-    const keysString = process.env.GROQ_API_KEYS;
-    
+    // Accept either GROQ_API_KEYS (comma-separated, rotated) or a single
+    // GROQ_API_KEY. Duplicates across both vars are collapsed.
+    const keysString = [process.env.GROQ_API_KEYS, process.env.GROQ_API_KEY]
+      .filter(Boolean)
+      .join(",");
+
     if (!keysString) {
-      throw new Error("GROQ_API_KEYS not found in environment variables");
+      throw new Error("GROQ_API_KEYS (or GROQ_API_KEY) not found in environment variables");
     }
 
-    this.keys = keysString
-      .split(",")
-      .map(k => k.trim())
-      .filter(k => k.startsWith("gsk_"));
+    this.keys = [...new Set(
+      keysString
+        .split(",")
+        .map(k => k.trim())
+        .filter(k => k.startsWith("gsk_"))
+    )];
 
     if (this.keys.length === 0) {
-      throw new Error("No valid Groq API keys found in GROQ_API_KEYS");
+      throw new Error("No valid Groq API keys found in GROQ_API_KEYS / GROQ_API_KEY");
     }
 
-    console.log(`✅ Loaded ${this.keys.length} Groq API keys for rotation`);
+    console.log(`✅ Loaded ${this.keys.length} Groq API key(s) for rotation`);
 
     // Initialize stats for each key
     this.keys.forEach((key, index) => {
@@ -105,16 +117,33 @@ class GroqKeyRotation {
         // Restore key stats
         if (data.keyStats && Array.isArray(data.keyStats)) {
           data.keyStats.forEach(stat => {
-            if (stat.keyIndex < this.keys.length) {
-              this.keyStats.set(stat.keyIndex, stat);
+            if (stat && stat.keyIndex >= 0 && stat.keyIndex < this.keys.length) {
+              // Merge over the freshly-initialised defaults so a state file
+              // written by an older version can't leave fields undefined,
+              // and so the preview always matches the current key order.
+              const base = this.keyStats.get(stat.keyIndex);
+              this.keyStats.set(stat.keyIndex, {
+                ...base,
+                ...stat,
+                keyIndex:   stat.keyIndex,
+                keyPreview: base?.keyPreview ?? stat.keyPreview,
+              });
             }
           });
         }
         
+        // The saved index can point past the end if the key list shrank
+        if (!Number.isInteger(this.currentIndex) ||
+            this.currentIndex < 0 ||
+            this.currentIndex >= this.keys.length) {
+          this.currentIndex = 0;
+        }
+
         console.log(`📊 Loaded rotation state: Current key index ${this.currentIndex}`);
       }
     } catch (err) {
       console.warn("⚠️ Could not load rotation state, starting fresh:", err.message);
+      this.currentIndex = 0;
     }
   }
 
@@ -164,16 +193,40 @@ class GroqKeyRotation {
     }
 
     const key = this.keys[this.currentIndex];
-    console.log(`🔑 Using Groq key ${this.currentIndex + 1}/${this.keys.length}: ${this.maskKey(key)}`);
-    
+
+    // Only log on an actual switch — this runs on every chat request
+    if (this._lastLoggedIndex !== this.currentIndex) {
+      console.log(`🔑 Using Groq key ${this.currentIndex + 1}/${this.keys.length}: ${this.maskKey(key)}`);
+      this._lastLoggedIndex = this.currentIndex;
+    }
+
     return key;
   }
 
   /**
    * Check if a key is on cooldown
    */
+  /**
+   * A key benched for consecutive errors gets another chance once
+   * ERROR_BENCH_PERIOD has passed. Returns true if the key is still benched.
+   */
+  isKeyBenched(stats) {
+    if (!stats) return false;
+    if ((stats.consecutiveErrors || 0) < CONFIG.MAX_ERRORS_BEFORE_SKIP) return false;
+
+    const since = stats.lastError?.timestamp ? new Date(stats.lastError.timestamp).getTime() : 0;
+    if (!since || Date.now() - since >= CONFIG.ERROR_BENCH_PERIOD) {
+      stats.consecutiveErrors = 0;
+      if (stats.status === "error") stats.status = "active";
+      console.log(`✅ Key ${stats.keyIndex + 1} bench period over, giving it another chance`);
+      this.saveState();
+      return false;
+    }
+    return true;
+  }
+
   isKeyCoolingDown(stats) {
-    if (!stats.isExhausted || !stats.exhaustedAt) return false;
+    if (!stats || !stats.isExhausted || !stats.exhaustedAt) return false;
     
     const cooldownEnd = new Date(stats.exhaustedAt).getTime() + CONFIG.COOLDOWN_PERIOD;
     const now = Date.now();
@@ -204,7 +257,7 @@ class GroqKeyRotation {
       const stats = this.keyStats.get(this.currentIndex);
       
       // Check if this key is available
-      if (!this.isKeyCoolingDown(stats) && stats.consecutiveErrors < CONFIG.MAX_ERRORS_BEFORE_SKIP) {
+      if (!this.isKeyCoolingDown(stats) && !this.isKeyBenched(stats)) {
         console.log(`🔄 Rotated from key ${startIndex + 1} to key ${this.currentIndex + 1}`);
         this.saveState();
         return;
@@ -246,11 +299,20 @@ class GroqKeyRotation {
       message: error.message || String(error),
       timestamp: new Date().toISOString(),
     };
+    // A malformed/oversized request (HTTP 400) is our fault, not the key's.
+    // Counting those toward consecutiveErrors used to park healthy keys in
+    // the "error" state and rotate through the whole pool over a prompt bug.
+    if (this.isRequestError(error)) {
+      stats.status = "active";
+      this.saveState();
+      return false;
+    }
+
     stats.consecutiveErrors++;
 
     // Check if it's a rate limit error
     const isRateLimit = this.isRateLimitError(error);
-    
+
     if (isRateLimit) {
       stats.rateLimitHits++;
       stats.isExhausted = true;
@@ -269,6 +331,19 @@ class GroqKeyRotation {
 
     this.saveState();
     return isRateLimit;
+  }
+
+  /**
+   * Check if the error is a bad request from our side (prompt too long,
+   * JSON validation failure, unsupported parameter) rather than a key problem.
+   * 429s are excluded — those are rate limits and must still rotate.
+   */
+  isRequestError(error) {
+    if (error?.status === 429) return false;
+    if (error?.status === 400) return true;
+    const msg = (error?.message || String(error)).toLowerCase();
+    if (msg.includes("rate limit") || msg.includes("429")) return false;
+    return msg.includes("invalid_request_error") || msg.includes("json_validate_failed");
   }
 
   /**
@@ -308,7 +383,7 @@ class GroqKeyRotation {
    * Get remaining cooldown time in milliseconds
    */
   getCooldownRemaining(stats) {
-    if (!stats.isExhausted || !stats.exhaustedAt) return 0;
+    if (!stats || !stats.isExhausted || !stats.exhaustedAt) return 0;
     
     const cooldownEnd = new Date(stats.exhaustedAt).getTime() + CONFIG.COOLDOWN_PERIOD;
     const remaining = cooldownEnd - Date.now();

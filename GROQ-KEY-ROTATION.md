@@ -27,7 +27,7 @@ GROQ_API_KEYS=key1,key2,key3,key4,key5,key6,key7,key8
 GROQ_MODEL=openai/gpt-oss-20b
 
 # Admin password for dashboard access
-ADMIN_PASSWORD=admin123
+ADMIN_PASSWORD=your_secure_password_here
 ```
 
 ### Rotation Settings
@@ -98,7 +98,7 @@ All endpoints require admin authentication via `?token=YOUR_ADMIN_PASSWORD`
 ### Get Key Statistics
 
 ```bash
-GET /api/admin/groq-keys?token=admin123
+GET /api/admin/groq-keys?token=your_secure_password_here
 ```
 
 **Response:**
@@ -136,7 +136,7 @@ GET /api/admin/groq-keys?token=admin123
 ### Reset a Specific Key
 
 ```bash
-POST /api/admin/groq-keys/reset/0?token=admin123
+POST /api/admin/groq-keys/reset/0?token=your_secure_password_here
 ```
 
 Removes cooldown and error state from key at index 0.
@@ -144,7 +144,7 @@ Removes cooldown and error state from key at index 0.
 ### Reset All Keys
 
 ```bash
-POST /api/admin/groq-keys/reset-all?token=admin123
+POST /api/admin/groq-keys/reset-all?token=your_secure_password_here
 ```
 
 Resets all keys to active state.
@@ -152,7 +152,7 @@ Resets all keys to active state.
 ### Set Current Active Key
 
 ```bash
-POST /api/admin/groq-keys/set-current/3?token=admin123
+POST /api/admin/groq-keys/set-current/3?token=your_secure_password_here
 ```
 
 Manually sets key at index 3 as the current active key.
@@ -213,14 +213,14 @@ npm start
 
 ```powershell
 # Get all keys status
-$response = Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=admin123"
+$response = Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=your_secure_password_here"
 $response | ConvertTo-Json -Depth 10
 
 # Reset a specific key
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset/0?token=admin123" -Method POST
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset/0?token=your_secure_password_here" -Method POST
 
 # Reset all keys
-Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset-all?token=admin123" -Method POST
+Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys/reset-all?token=your_secure_password_here" -Method POST
 ```
 
 ### Monitoring Logs
@@ -251,7 +251,7 @@ If you need to force reset all keys:
 
 ```bash
 # Via API
-curl -X POST "http://localhost:3001/api/admin/groq-keys/reset-all?token=admin123"
+curl -X POST "http://localhost:3001/api/admin/groq-keys/reset-all?token=your_secure_password_here"
 
 # Or via dashboard
 # Go to http://localhost:3001/groq-keys-dashboard.html

@@ -2,8 +2,9 @@
  * VisualPanel — deterministic renderer.
  * Receives visualAction from store and renders the correct component.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAssistantStore } from "../../store/assistantStore";
+import { getCollegeConfig } from "../../services/collegeConfig";
 import { ChevronLeft, Globe, FileText, ExternalLink } from "lucide-react";
 import { HomePanel } from "./HomePanel";
 import { ProgramViewer, ProgramsListViewer } from "./ProgramViewer";
@@ -16,16 +17,24 @@ import {
   AdmissionFormViewer,
 } from "./SunwayViewers";
 
-const SUNWAY_RED = "#B51F24";
-const DARK_RED = "#8F171B";
+const SUNWAY_RED = "var(--brand)";
+const DARK_RED = "var(--brand-dark)";
 const BORDER = "#E8E8E8";
 
 export function VisualPanel({ onQuery }) {
-  const { visualAction, previousVisualAction } = useAssistantStore();
+  const { visualAction } = useAssistantStore();
   const [displayed, setDisplayed]   = useState(visualAction);
   const [animating, setAnimating]   = useState(false);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    // The first render already shows the right panel — running the crossfade
+    // here just blanks it for 180ms on mount
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      setDisplayed(visualAction);
+      return;
+    }
     setAnimating(true);
     const t = setTimeout(() => { setDisplayed(visualAction); setAnimating(false); }, 180);
     return () => clearTimeout(t);
@@ -41,14 +50,8 @@ export function VisualPanel({ onQuery }) {
 
   return (
     <div style={{
-      background: "rgba(255,255,255,0.95)",
-      border: `1px solid rgba(181,31,36,0.08)`,
-      borderRadius: 20,
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
-      overflow: "hidden",
-      marginBottom: 14,
-      boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+      display: "flex", flexDirection: "column",
+      background: "transparent",
       opacity: animating ? 0 : 1,
       transform: animating ? "translateY(8px)" : "translateY(0)",
       transition: "all 0.25s ease",
@@ -87,7 +90,7 @@ export function VisualPanel({ onQuery }) {
       )}
 
       {/* Content */}
-      <div style={{ maxHeight: 520, overflowY: "auto" }}>
+      <div style={{ paddingRight: 4 }}>
         {renderContent(type, resourceId, title, onQuery)}
       </div>
     </div>
@@ -141,14 +144,16 @@ function PDFView({ resourceId, title }) {
 }
 // 360 Virtual Tour — embeds the actual tour URL in an iframe
 function VirtualTourViewer({ resourceId, title }) {
-  const TOUR_URL = "https://virtualtour.thebritishcollege.edu.np/?_gl=1*1rmnuzr*_gcl_aw*R0NMLjE3ODY0MjY1MzUuQ2owS0NRanc3ZVhUQmhEQkFSSXNBS0YtdzQ0TUY3S24zTDJ4YUlNSVFGVWNyaC1LT3QwY0NEbkZtWmxkMllRZlhLSVIzZFduQlRlRnl1b2FBanBjRUFMd193Y0I.*_gcl_au*MTY0MzA4MDI2Ni4xNzg2NDI2NTI2";
+  // Comes from the active college's config.json (admin panel → Branding),
+  // so each college shows its own tour instead of a hard-coded one.
+  const TOUR_URL = getCollegeConfig().virtualTourUrl;
   const [fullscreen, setFullscreen] = React.useState(false);
 
   return (
     <div style={{ padding: "14px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Globe size={16} color="#8B1A1A" />
+          <Globe size={16} color={SUNWAY_RED} />
           <span style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>
             {title || "360° Virtual Campus Tour"}
           </span>
@@ -160,7 +165,7 @@ function VirtualTourViewer({ resourceId, title }) {
             {fullscreen ? "⊡ Minimize" : "⛶ Fullscreen"}
           </button>
           <a href={TOUR_URL} target="_blank" rel="noopener noreferrer"
-            style={{ background: "#8B1A1A", color: "#fff", border: "none", borderRadius: 7, padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+            style={{ background: SUNWAY_RED, color: "#fff", border: "none", borderRadius: 7, padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
             <ExternalLink size={11} /> Open
           </a>
         </div>
@@ -171,7 +176,7 @@ function VirtualTourViewer({ resourceId, title }) {
         height: fullscreen ? "70vh" : "400px",
         borderRadius: 12,
         overflow: "hidden",
-        border: "1.5px solid rgba(139,26,26,0.2)",
+        border: "1.5px solid rgba(var(--brand-rgb), 0.2)",
         background: "#000",
         transition: "height 0.3s ease",
       }}>
@@ -185,7 +190,7 @@ function VirtualTourViewer({ resourceId, title }) {
           allowFullScreen
         />
       </div>
-      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 7, textAlign: "center" }}>
+      <p style={{ fontSize: 11, color: "#888", marginTop: 7, textAlign: "center" }}>
         Drag to rotate · Scroll to zoom · Click hotspots to explore
       </p>
     </div>

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>College Admin — AI Assistant</title>
+<style>
+  :root { --red:#B51F24; --dark:#8F171B; --bg:#F5F6F8; --line:#E4E7EC; --muted:#667085; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#101828;font-size:14px}
+  header{background:#fff;border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
+  header h1{font-size:17px;font-weight:800}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px}
+  .card h2{font-size:15px;font-weight:800;margin-bottom:4px}
+  .card p.hint{color:var(--muted);font-size:12.5px;margin-bottom:14px;line-height:1.5}
+  label{display:block;font-weight:600;font-size:12.5px;margin:12px 0 5px}
+  input,textarea,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13.5px;background:#fff}
+  textarea{resize:vertical;min-height:70px;font-family:inherit}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(181,31,36,.1)}
+  button{background:var(--red);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer}
+  button:hover{background:var(--dark)} button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:#fff;color:#344054;border:1px solid var(--line)}
+  button.ghost:hover{background:#F9FAFB}
+  button.danger{background:#fff;color:#B42318;border:1px solid #FDA29B}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  nav{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:18px;flex-wrap:wrap}
+  nav button{background:transparent;color:var(--muted);font-weight:700;padding:8px 14px}
+  nav button.on{background:var(--red);color:#fff}
+  .pill{display:inline-block;background:#ECFDF3;color:#027A48;border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:700}
+  .pill.off{background:#F2F4F7;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#101828;color:#fff;padding:11px 20px;border-radius:9px;font-size:13.5px;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  .toast.err{background:#B42318}
+  .empty{color:var(--muted);text-align:center;padding:26px;font-style:italic}
+  code{background:#F2F4F7;padding:1px 6px;border-radius:4px;font-size:12.5px}
+  .score{font-weight:800;color:var(--red)}
+  #login{max-width:380px;margin:90px auto}
+  .assets{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+  .asset{border:1px solid var(--line);border-radius:9px;padding:8px;width:130px;text-align:center;background:#fff}
+  .asset img{width:100%;height:70px;object-fit:contain;margin-bottom:6px}
+  .asset .fn{font-size:10.5px;color:var(--muted);word-break:break-all;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div id="login" class="card" style="display:none">
+  <h2>College Admin</h2>
+  <p class="hint">Enter the admin password from your <code>.env</code> file.</p>
+  <input id="pw" type="password" placeholder="Admin password" onkeydown="if(event.key==='Enter')login()" />
+  <div style="margin-top:12px"><button onclick="login()">Sign in</button></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>College Admin</h1>
+    <select id="collegePicker" style="width:auto;min-width:210px" onchange="switchCollege(this.value)"></select>
+    <span id="activeBadge"></span>
+    <div style="flex:1"></div>
+    <button class="ghost" onclick="logout()">Sign out</button>
+  </header>
+
+  <div class="wrap">
+    <nav>
+      <button class="on" onclick="tab('colleges',this)">Colleges</button>
+      <button onclick="tab('branding',this)">Branding &amp; Files</button>
+      <button onclick="tab('faq',this)">Questions &amp; Answers</button>
+      <button onclick="tab('docs',this)">PDF Documents</button>
+      <button onclick="tab('data',this)">College Data</button>
+      <button onclick="tab('test',this)">Test the Bot</button>
+    </nav>
+
+    <!-- COLLEGES -->
+    <section id="p-colleges">
+      <div class="card">
+        <h2>Add a college</h2>
+        <p class="hint">Creates a new folder with empty <code>config.json</code>, <code>data.json</code> and <code>faq.json</code>. Nothing else is affected.</p>
+        <div class="grid2">
+          <div><label>College name</label><input id="newName" placeholder="ABC International College" /></div>
+          <div><label>Short id (folder name)</label><input id="newSlug" placeholder="abc" /></div>
+        </div>
+        <div style="margin-top:14px"><button onclick="createCollege()">Create college</button></div>
+      </div>
+      <div class="card">
+        <h2>All colleges</h2>
+        <p class="hint">“Serving” is the one students currently talk to.</p>
+        <table><thead><tr><th>Name</th><th>Id</th><th>Q&amp;A</th><th>Status</th><th></th></tr></thead>
+        <tbody id="collegeRows"></tbody></table>
+      </div>
+    </section>
+
+    <!-- BRANDING -->
+    <section id="p-branding" style="display:none">
+      <div class="card">
+        <h2>Branding</h2>
+        <p class="hint">Name, colours and links for this college. Saved to <code>config.json</code>.</p>
+        <div class="grid2">
+          <div><label>College name</label><input id="c_name" /></div>
+          <div><label>Short name</label><input id="c_shortName" /></div>
+          <div><label>Assistant name</label><input id="c_assistantName" /></div>
+          <div><label>Tagline</label><input id="c_tagline" /></div>
+          <div><label>Brand colour</label><input id="c_brandColor" placeholder="#B51F24" /></div>
+          <div><label>Brand colour (dark)</label><input id="c_brandColorDark" placeholder="#8F171B" /></div>
+          <div><label>Website</label><input id="c_website" /></div>
+          <div><label>Apply URL</label><input id="c_applyUrl" /></div>
+          <div><label>Logo URL</label><input id="c_logoUrl" /></div>
+          <div><label>Building image</label><input id="c_buildingImage" /></div>
+          <div><label>Page background</label><input id="c_pageBackground" /></div>
+          <div><label>Avatar backdrop</label><input id="c_avatarBackground" /></div>
+          <div><label>Virtual tour URL</label><input id="c_virtualTourUrl" /></div>
+        </div>
+        <div style="margin-top:16px"><button onclick="saveConfig()">Save branding</button></div>
+      </div>
+      <div class="card">
+        <h2>Images &amp; logo</h2>
+        <p class="hint">Upload PNG, JPG, WEBP, GIF or SVG (max 5 MB). After uploading, copy the URL into a field above.</p>
+        <input type="file" id="assetFile" accept="image/*" />
+        <div style="margin-top:10px"><button onclick="uploadAsset()">Upload image</button></div>
+        <div class="assets" id="assetList"></div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="p-faq" style="display:none">
+      <div class="card">
+        <h2>Add a question</h2>
+        <p class="hint">
+          Write the question the way a student would ask it, then the answer the assistant should give.
+          <strong>Only write answers you know are true</strong> — whatever you put here is what students are told.
+        </p>
+        <label>Question *</label>
+        <input id="f_q" placeholder="Do you provide hostel facilities?" />
+        <label>Other ways students might ask it (one per line)</label>
+        <textarea id="f_alt" placeholder="hostel cha?&#10;is there accommodation&#10;where will I stay"></textarea>
+        <label>Answer *</label>
+        <textarea id="f_a" placeholder="We do not run our own hostel, but our admissions team helps students find rooms near the campus."></textarea>
+        <div class="grid2">
+          <div><label>Tags (comma separated)</label><input id="f_tags" placeholder="hostel, accommodation" /></div>
+          <div><label>Panel to open (optional)</label>
+            <select id="f_visual">
+              <option value="">— none —</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button onclick="addFaq()" id="addBtn">Add question</button>
+          <button class="ghost" onclick="clearForm()">Clear</button>
+          <span id="editNote" style="color:var(--muted);font-size:12.5px"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Add many at once</h2>
+        <p class="hint">One per line as <code>question | answer</code>. Example:<br>
+          <code>Do you have a library? | Yes, open Sunday to Friday, 9am-5pm.</code></p>
+        <textarea id="bulk" style="min-height:110px" placeholder="Do you have a canteen? | Yes, on the ground floor.&#10;Is there parking? | Yes, free parking for students."></textarea>
+        <div style="margin-top:12px"><button onclick="addBulk()">Add all</button></div>
+      </div>
+
+
+      <div class="card">
+        <h2>Questions students asked that you have no answer for (<span id="gapCount">0</span>)</h2>
+        <p class="hint">
+          Every time the assistant has to say “I don’t have verified info”, the question is recorded here,
+          most-asked first. This is the shortlist of what to add next — taken from real students, not guesswork.
+        </p>
+        <table><thead><tr><th style="width:55%">Question</th><th style="width:70px">Asked</th><th style="width:90px">Language</th><th style="width:150px"></th></tr></thead>
+        <tbody id="gapRows"></tbody></table>
+        <div style="margin-top:12px"><button class="ghost" onclick="clearGaps()">Clear the whole list</button></div>
+      </div>
+      <div class="card">
+        <h2>Saved questions (<span id="faqCount">0</span>)</h2>
+        <p class="hint">Changes go live immediately — no restart needed.</p>
+        <input id="faqFilter" placeholder="Filter…" oninput="renderFaqs()" style="margin-bottom:12px" />
+        <table><thead><tr><th style="width:38%">Question</th><th>Answer</th><th style="width:110px"></th></tr></thead>
+        <tbody id="faqRows"></tbody></table>
+      </div>
+    </section>
+
+
+    <!-- PDF DOCUMENTS -->
+    <section id="p-docs" style="display:none">
+      <div class="card">
+        <h2>Upload a PDF</h2>
+        <p class="hint">
+          Upload a prospectus, fee sheet, handbook or policy. The text is read once and split into
+          searchable passages, so students can ask questions about it straight away — no restart needed.
+          <br><br>
+          <strong>The PDF must contain real text.</strong> A scanned photocopy is just images and cannot be read;
+          run OCR on it first. Maximum size 25 MB.
+        </p>
+        <label>Title students will see in the source</label>
+        <input id="docTitle" placeholder="Student Handbook 2026" />
+        <label>PDF file</label>
+        <input type="file" id="docFile" accept="application/pdf,.pdf" />
+        <div class="row" style="margin-top:12px">
+          <button onclick="uploadDoc()" id="docUploadBtn">Upload PDF</button>
+          <span id="docStatus" style="color:var(--muted);font-size:12.5px"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Uploaded documents (<span id="docCount">0</span>)</h2>
+        <p class="hint">Deleting a document removes its passages from the assistant immediately.</p>
+        <table><thead><tr><th>Title</th><th style="width:70px">Pages</th><th style="width:90px">Passages</th><th style="width:120px">Uploaded</th><th style="width:90px"></th></tr></thead>
+        <tbody id="docRows"></tbody></table>
+      </div>
+
+      <div class="card">
+        <h2>Test what the PDF answers</h2>
+        <p class="hint">Type a student question and see exactly which passage the assistant would quote.</p>
+        <div class="row">
+          <input id="docTestQ" placeholder="what are the library timings" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')runDocTest()" />
+          <button onclick="runDocTest()">Test</button>
+        </div>
+        <div id="docTestOut" style="margin-top:16px"></div>
+      </div>
+    </section>
+
+    <!-- DATA -->
+    <section id="p-data" style="display:none">
+      <div class="card">
+        <h2>College data</h2>
+        <p class="hint">
+          Structured facts that fill the panels on the right of the assistant — programs, fee tables, contacts.
+          This is <code>data.json</code>. Edit carefully: it must stay valid JSON.
+        </p>
+        <textarea id="dataJson" style="min-height:440px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button onclick="saveData()">Save college data</button>
+          <button class="ghost" onclick="formatData()">Tidy formatting</button>
+          <span id="dataMsg" style="color:var(--muted);font-size:12.5px"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEST -->
+    <section id="p-test" style="display:none">
+      <div class="card">
+        <h2>Test the bot</h2>
+        <p class="hint">Type a question the way a student would. This shows which saved Q&amp;A the assistant would use — before any student hits it.</p>
+        <div class="row">
+          <input id="testQ" placeholder="bit ko fee kati parcha" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')runTest()" />
+          <button onclick="runTest()">Test</button>
+        </div>
+        <div id="testOut" style="margin-top:16px"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const PANELS = ["SHOW_HOME","SHOW_ABOUT","SHOW_WHY_SUNWAY","SHOW_PROGRAM","SHOW_PROGRAMS_LIST","COMPARE_PROGRAMS",
+  "SHOW_MODULES","SHOW_FEE_STRUCTURE","SHOW_FEE_SCHEDULE","SHOW_ADMISSION","SHOW_ADMISSION_DOCUMENTS",
+  "SHOW_SCHOLARSHIP","SHOW_CAREERS","SHOW_PLACEMENT","SHOW_UNIVERSITY_PARTNER","SHOW_RAIN","SHOW_INNOVATION_LAB",
+  "SHOW_ACADEMIC_ADVISORY","SHOW_STUDENT_LIFE","SHOW_CONTACT","SHOW_APPLY","SHOW_360"];
+
+let token = sessionStorage.getItem("adminToken") || "";
+let slug = null, faqs = [], editIndex = -1;
+
+const $ = id => document.getElementById(id);
+function toast(msg, isErr) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isErr ? " err" : ""); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
+}
+async function api(path, opts = {}) {
+  const r = await fetch("/api/college-admin" + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", "x-admin-token": token, ...(opts.headers || {}) },
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.success === false) throw new Error(d.error || ("Request failed (" + r.status + ")"));
+  return d;
+}
+
+// ── auth ──
+async function login() {
+  token = $("pw").value.trim();
+  if (!token) return;
+  try { await api("/colleges"); sessionStorage.setItem("adminToken", token); boot(); }
+  catch (e) { toast(e.message, true); }
+}
+function logout(){ sessionStorage.removeItem("adminToken"); location.reload(); }
+
+async function boot() {
+  $("login").style.display = "none";
+  $("app").style.display = "block";
+  PANELS.forEach(p => { const o = document.createElement("option"); o.value = o.textContent = p; $("f_visual").appendChild(o); });
+  await loadColleges();
+}
+(async function init(){
+  if (!token) { $("login").style.display = "block"; return; }
+  try { await api("/colleges"); boot(); } catch { $("login").style.display = "block"; }
+})();
+
+function tab(name, btn) {
+  ["colleges","branding","faq","docs","data","test"].forEach(n => {
+    $("p-" + n).style.display = (n === name) ? "block" : "none";
+  });
+  document.querySelectorAll("nav button").forEach(b => b.classList.remove("on"));
+  if (btn) btn.classList.add("on");
+}
+
+// ── colleges ──
+async function loadColleges() {
+  const d = await api("/colleges");
+  const picker = $("collegePicker");
+  picker.innerHTML = "";
+  d.colleges.forEach(c => {
+    const o = document.createElement("option");
+    o.value = c.slug; o.textContent = c.name;
+    picker.appendChild(o);
+  });
+  slug = slug && d.colleges.some(c => c.slug === slug) ? slug : d.active;
+  picker.value = slug;
+  $("activeBadge").innerHTML = d.active === slug
+    ? '<span class="pill">Serving students</span>'
+    : '<span class="pill off">Not live</span>';
+
+  $("collegeRows").innerHTML = d.colleges.map(c => `
+    <tr>
+      <td><strong>${esc(c.name)}</strong></td>
+      <td><code>${esc(c.slug)}</code></td>
+      <td>${c.faqCount}</td>
+      <td>${c.isActive ? '<span class="pill">Serving</span>' : '<span class="pill off">Idle</span>'}</td>
+      <td>${c.isActive ? "" : `<button class="ghost" onclick="activate('${esc(c.slug)}')">Make live</button>`}</td>
+    </tr>`).join("") || `<tr><td colspan="5" class="empty">No colleges yet</td></tr>`;
+
+  await Promise.all([loadConfig(), loadFaqs(), loadData(), loadAssets(), loadDocs(), loadGaps()]);
+}
+
+async function switchCollege(v) { slug = v; await loadColleges(); toast("Switched to " + v); }
+
+async function createCollege() {
+  const name = $("newName").value.trim();
+  let s = $("newSlug").value.trim().toLowerCase();
+  if (!name) return toast("Enter a college name", true);
+  if (!s) s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  try {
+    await api("/colleges", { method: "POST", body: JSON.stringify({ slug: s, name }) });
+    $("newName").value = ""; $("newSlug").value = "";
+    slug = s; await loadColleges(); toast("Created " + name);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function activate(s) {
+  try { const r = await api(`/colleges/${s}/activate`, { method: "POST" }); slug = s; await loadColleges(); toast(r.message); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ── branding ──
+const CFG = ["name","shortName","assistantName","tagline","brandColor","brandColorDark","website","applyUrl","logoUrl","buildingImage","pageBackground","avatarBackground","virtualTourUrl"];
+async function loadConfig() {
+  const d = await api(`/colleges/${slug}/config`);
+  CFG.forEach(k => { const el = $("c_" + k); if (el) el.value = d.content?.[k] ?? ""; });
+}
+async function saveConfig() {
+  const content = await api(`/colleges/${slug}/config`).then(d => d.content || {});
+  CFG.forEach(k => { const el = $("c_" + k); if (el) content[k] = el.value.trim(); });
+  content.slug = slug;
+  try { await api(`/colleges/${slug}/config`, { method: "PUT", body: JSON.stringify({ content }) }); toast("Branding saved"); await loadColleges(); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ── assets ──
+async function loadAssets() {
+  const d = await api(`/colleges/${slug}/assets`);
+  $("assetList").innerHTML = d.assets.map(a => `
+    <div class="asset">
+      <img src="${esc(a.url)}" alt="" />
+      <div class="fn">${esc(a.filename)}</div>
+      <button class="ghost" style="font-size:11px;padding:4px 8px" onclick="copyUrl('${esc(a.url)}')">Copy URL</button>
+      <button class="danger" style="font-size:11px;padding:4px 8px;margin-top:4px" onclick="delAsset('${esc(a.filename)}')">Delete</button>
+    </div>`).join("") || `<div class="empty">No images uploaded yet</div>`;
+}
+function copyUrl(u) { navigator.clipboard.writeText(u); toast("URL copied — paste it into a field above"); }
+async function delAsset(f) {
+  if (!confirm("Delete " + f + "?")) return;
+  try { await api(`/colleges/${slug}/assets/${encodeURIComponent(f)}`, { method: "DELETE" }); await loadAssets(); toast("Deleted"); }
+  catch (e) { toast(e.message, true); }
+}
+function uploadAsset() {
+  const f = $("assetFile").files[0];
+  if (!f) return toast("Choose an image first", true);
+  const rd = new FileReader();
+  rd.onload = async () => {
+    try {
+      const r = await api(`/colleges/${slug}/assets`, { method: "POST", body: JSON.stringify({ filename: f.name, dataUrl: rd.result }) });
+      $("assetFile").value = ""; await loadAssets(); toast(`Uploaded (${r.sizeKb} KB)`);
+    } catch (e) { toast(e.message, true); }
+  };
+  rd.readAsDataURL(f);
+}
+
+// ── faq ──
+async function loadFaqs() {
+  const d = await api(`/colleges/${slug}/faq`);
+  faqs = Array.isArray(d.content) ? d.content : [];
+  renderFaqs();
+}
+function renderFaqs() {
+  $("faqCount").textContent = faqs.length;
+  const q = ($("faqFilter").value || "").toLowerCase();
+  const rows = faqs.map((f, i) => ({ f, i }))
+    .filter(({ f }) => !q || (f.q + " " + f.a).toLowerCase().includes(q));
+  $("faqRows").innerHTML = rows.map(({ f, i }) => `
+    <tr>
+      <td><strong>${esc(f.q)}</strong>${(f.alt || []).length ? `<div style="color:var(--muted);font-size:11.5px;margin-top:3px">+ ${f.alt.length} other phrasings</div>` : ""}</td>
+      <td>${esc(f.a).slice(0, 150)}${f.a.length > 150 ? "…" : ""}</td>
+      <td>
+        <button class="ghost" style="font-size:11.5px;padding:5px 9px" onclick="editFaq(${i})">Edit</button>
+        <button class="danger" style="font-size:11.5px;padding:5px 9px;margin-top:4px" onclick="delFaq(${i})">Delete</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="3" class="empty">No questions yet — add one above</td></tr>`;
+}
+function clearForm() {
+  ["f_q","f_alt","f_a","f_tags"].forEach(id => $(id).value = "");
+  $("f_visual").value = ""; editIndex = -1;
+  $("addBtn").textContent = "Add question"; $("editNote").textContent = "";
+}
+function editFaq(i) {
+  const f = faqs[i];
+  $("f_q").value = f.q; $("f_a").value = f.a;
+  $("f_alt").value = (f.alt || []).join("\n");
+  $("f_tags").value = (f.tags || []).join(", ");
+  $("f_visual").value = f.visual || "";
+  editIndex = i; $("addBtn").textContent = "Save changes";
+  $("editNote").textContent = "Editing existing question";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+async function addFaq() {
+  const q = $("f_q").value.trim(), a = $("f_a").value.trim();
+  if (!q) return toast("Question is required", true);
+  if (!a) return toast("Answer is required", true);
+  const entry = {
+    q, a,
+    alt:  $("f_alt").value.split("\n").map(s => s.trim()).filter(Boolean),
+    tags: $("f_tags").value.split(",").map(s => s.trim()).filter(Boolean),
+  };
+  const v = $("f_visual").value; if (v) entry.visual = v;
+  if (editIndex >= 0) faqs[editIndex] = entry; else faqs.push(entry);
+  await persistFaqs(editIndex >= 0 ? "Question updated" : "Question added");
+  clearForm();
+}
+async function delFaq(i) {
+  if (!confirm("Delete this question?")) return;
+  faqs.splice(i, 1);
+  await persistFaqs("Deleted");
+}
+async function addBulk() {
+  const lines = $("bulk").value.split("\n").map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return toast("Nothing to add", true);
+  let added = 0, skipped = 0;
+  for (const line of lines) {
+    const idx = line.indexOf("|");
+    if (idx < 0) { skipped++; continue; }
+    const q = line.slice(0, idx).trim(), a = line.slice(idx + 1).trim();
+    if (!q || !a) { skipped++; continue; }
+    faqs.push({ q, a, alt: [], tags: [] }); added++;
+  }
+  if (!added) return toast("Use the format:  question | answer", true);
+  await persistFaqs(`Added ${added}${skipped ? `, skipped ${skipped}` : ""}`);
+  $("bulk").value = "";
+}
+async function persistFaqs(msg) {
+  try { await api(`/colleges/${slug}/faq`, { method: "PUT", body: JSON.stringify({ content: faqs }) }); renderFaqs(); toast(msg); await loadColleges0(); await loadGaps(); }
+  catch (e) { toast(e.message, true); await loadFaqs(); }
+}
+// refresh only the counts, without re-fetching everything
+async function loadColleges0() {
+  try { const d = await api("/colleges"); const c = d.colleges.find(x => x.slug === slug); if (c) $("faqCount").textContent = c.faqCount; } catch {}
+}
+
+// ── pdf documents ──
+async function loadDocs() {
+  const d = await api(`/colleges/${slug}/documents`);
+  const docs = d.documents || [];
+  $("docCount").textContent = docs.length;
+  $("docRows").innerHTML = docs.map(x => `
+    <tr>
+      <td><strong>${esc(x.title)}</strong><div style="color:var(--muted);font-size:11.5px">${esc(x.filename || "")}</div></td>
+      <td>${x.pages}</td>
+      <td>${x.chunkCount}</td>
+      <td style="font-size:11.5px">${new Date(x.uploadedAt).toLocaleDateString()}</td>
+      <td><button class="danger" style="font-size:11.5px;padding:5px 9px" onclick="delDoc('${esc(x.id)}')">Delete</button></td>
+    </tr>`).join("") || `<tr><td colspan="5" class="empty">No PDFs uploaded yet</td></tr>`;
+}
+
+function uploadDoc() {
+  const f = $("docFile").files[0];
+  if (!f) return toast("Choose a PDF first", true);
+  if (f.size > 25 * 1024 * 1024) return toast("That PDF is larger than 25 MB", true);
+
+  const btn = $("docUploadBtn");
+  btn.disabled = true;
+  $("docStatus").textContent = `Reading ${f.name}… this can take a moment for a long PDF.`;
+
+  const rd = new FileReader();
+  rd.onload = async () => {
+    try {
+      const r = await api(`/colleges/${slug}/documents`, {
+        method: "POST",
+        body: JSON.stringify({ filename: f.name, title: $("docTitle").value.trim() || f.name, dataUrl: rd.result }),
+      });
+      $("docFile").value = ""; $("docTitle").value = "";
+      $("docStatus").textContent = "";
+      await loadDocs();
+      toast(r.message);
+    } catch (e) {
+      $("docStatus").textContent = "";
+      toast(e.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+  rd.onerror = () => { btn.disabled = false; $("docStatus").textContent = ""; toast("Could not read that file", true); };
+  rd.readAsDataURL(f);
+}
+
+async function delDoc(id) {
+  if (!confirm("Remove this document from the assistant?")) return;
+  try { await api(`/colleges/${slug}/documents/${id}`, { method: "DELETE" }); await loadDocs(); toast("Document removed"); }
+  catch (e) { toast(e.message, true); }
+}
+
+async function runDocTest() {
+  const question = $("docTestQ").value.trim();
+  if (!question) return;
+  try {
+    const d = await api("/documents/test", { method: "POST", body: JSON.stringify({ question }) });
+    $("docTestOut").innerHTML = d.passages.length ? `
+      <table><thead><tr><th style="width:70px">Score</th><th style="width:150px">Source</th><th>Passage the assistant would use</th></tr></thead><tbody>
+      ${d.passages.map((p, i) => `<tr>
+        <td class="score">${p.score}${i === 0 ? " ★" : ""}</td>
+        <td>${esc(p.title)}${p.page ? `<div style="color:var(--muted);font-size:11.5px">page ${p.page}</div>` : ""}</td>
+        <td style="font-size:12.5px">${esc(p.text).slice(0, 320)}</td></tr>`).join("")}
+      </tbody></table>
+      <p class="hint" style="margin-top:10px">★ = the passage the assistant will quote from.</p>`
+      : `<div class="empty">No passage in your PDFs matches this question. Try different wording, or add a Q&amp;A entry for it.</div>`;
+  } catch (e) { toast(e.message, true); }
+}
+
+
+// ── unanswered questions ──
+async function loadGaps() {
+  const d = await api(`/colleges/${slug}/unanswered`);
+  const rows = d.questions || [];
+  $("gapCount").textContent = rows.length;
+  $("gapRows").innerHTML = rows.map(g => `
+    <tr>
+      <td>${esc(g.question)}</td>
+      <td><strong>${g.count}</strong></td>
+      <td style="font-size:11.5px">${esc((g.languages||[]).join(", "))}</td>
+      <td>
+        <button class="ghost" style="font-size:11.5px;padding:5px 9px" onclick="answerGap('${esc(g.key)}')">Write answer</button>
+        <button class="danger" style="font-size:11.5px;padding:5px 9px;margin-top:4px" onclick="dismissGap('${esc(g.key)}')">Dismiss</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="4" class="empty">Nothing yet — every question so far has been answered</td></tr>`;
+  window.__gaps = rows;
+}
+function answerGap(key) {
+  const g = (window.__gaps || []).find(x => x.key === key);
+  if (!g) return;
+  clearForm();
+  $("f_q").value = g.question;
+  $("f_a").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  toast("Question copied into the form — write the answer and click Add");
+}
+async function dismissGap(key) {
+  try { await api(`/colleges/${slug}/unanswered?key=${encodeURIComponent(key)}`, { method: "DELETE" }); await loadGaps(); }
+  catch (e) { toast(e.message, true); }
+}
+async function clearGaps() {
+  if (!confirm("Clear the whole list of unanswered questions?")) return;
+  try { await api(`/colleges/${slug}/unanswered`, { method: "DELETE" }); await loadGaps(); toast("List cleared"); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ── data ──
+async function loadData() {
+  const d = await api(`/colleges/${slug}/data`);
+  $("dataJson").value = JSON.stringify(d.content ?? {}, null, 2);
+  $("dataMsg").textContent = "";
+}
+function formatData() {
+  try { $("dataJson").value = JSON.stringify(JSON.parse($("dataJson").value), null, 2); $("dataMsg").textContent = "Looks like valid JSON"; }
+  catch (e) { $("dataMsg").textContent = "Invalid JSON: " + e.message; }
+}
+async function saveData() {
+  let parsed;
+  try { parsed = JSON.parse($("dataJson").value); }
+  catch (e) { return toast("Invalid JSON — " + e.message, true); }
+  try { await api(`/colleges/${slug}/data`, { method: "PUT", body: JSON.stringify({ content: parsed }) }); toast("College data saved"); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ── test ──
+async function runTest() {
+  const question = $("testQ").value.trim();
+  if (!question) return;
+  try {
+    const d = await api("/faq/test", { method: "POST", body: JSON.stringify({ question }) });
+    $("testOut").innerHTML = d.matches.length ? `
+      <table><thead><tr><th style="width:70px">Score</th><th style="width:35%">Matched question</th><th>Answer it would use</th></tr></thead><tbody>
+      ${d.matches.map((m, i) => `<tr>
+        <td class="score">${m.score}${i === 0 ? " ★" : ""}</td>
+        <td>${esc(m.q)}</td><td>${esc(m.a).slice(0, 200)}</td></tr>`).join("")}
+      </tbody></table>
+      <p class="hint" style="margin-top:10px">★ = the answer the assistant will use.</p>`
+      : `<div class="empty">No saved question matches this. The assistant will fall back to general college info — add a Q&amp;A for it.</div>`;
+  } catch (e) { toast(e.message, true); }
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+</script>
+</body>
+</html>

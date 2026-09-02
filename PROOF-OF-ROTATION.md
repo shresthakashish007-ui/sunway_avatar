@@ -179,7 +179,7 @@ When a key hits rate limit, logs will show:
 After running for a while, you can check statistics:
 
 ```powershell
-$stats = Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=admin123"
+$stats = Invoke-RestMethod -Uri "http://localhost:3001/api/admin/groq-keys?token=your_secure_password_here"
 $stats | ConvertTo-Json
 ```
 
@@ -275,7 +275,7 @@ $stats | ConvertTo-Json
 To watch it work in real-time:
 
 1. Open: http://localhost:3001/groq-keys-dashboard.html
-2. Login with: admin123
+2. Login with: your_secure_password_here
 3. Make chat requests
 4. Watch statistics update live
 5. See which key is active

@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { getResource } from "../../services/chatService";
 import { AlertTriangle, Download, ChevronRight, Clock } from "lucide-react";
 
-const R = "#8B1A1A"; const RL = "#FDF2F2";
+const R = "var(--brand)"; const RL = "var(--brand-lighter)";
 
 /* ── Fee Structure ───────────────────────────────────────────────────────── */
 export function FeeViewer({ resourceId, title, onQuery }) {
   const [data, setData]     = useState(null);
   const [loading, setLoad]  = useState(true);
+  const [error, setError]   = useState(null);
   const [activeYear, setActiveYear] = useState(1);
 
   const pid = (() => {
@@ -24,11 +25,29 @@ export function FeeViewer({ resourceId, title, onQuery }) {
   })();
 
   useEffect(() => {
+    console.log('[FeeViewer] Loading fees for:', pid);
     setLoad(true);
-    getResource("fees", pid).then(r => { setData(r.data); setLoad(false); }).catch(() => setLoad(false));
+    setError(null);
+    getResource("fees", pid)
+      .then(r => { 
+        console.log('[FeeViewer] Received data:', r);
+        if (r && r.data) {
+          setData(r.data);
+        } else {
+          console.error('[FeeViewer] No data in response:', r);
+          setError("No fee data received from server");
+        }
+        setLoad(false);
+      })
+      .catch(err => {
+        console.error('[FeeViewer] Error loading fees:', err);
+        setError(err.message || "Failed to load fee information");
+        setLoad(false);
+      });
   }, [pid]);
 
   if (loading) return <Load />;
+  if (error) return <Err msg={error} />;
   if (!data) return <Err msg="Fee information not found." />;
 
   const year = data.years?.find(y => y.year === activeYear) || data.years?.[0];
@@ -131,7 +150,7 @@ export function FeeViewer({ resourceId, title, onQuery }) {
           Admission Requirements
         </button>
         <button onClick={() => onQuery?.("Tell me about scholarships")}
-          style={{ flex: 1, background: RL, color: R, border: `1px solid ${R}33`, borderRadius: 8, padding: "9px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+          style={{ flex: 1, background: RL, color: R, border: `1px solid rgba(var(--brand-rgb), 0.2)`, borderRadius: 8, padding: "9px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
           Scholarships
         </button>
       </div>

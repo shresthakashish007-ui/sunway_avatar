@@ -1,0 +1,560 @@
+[
+  {
+    "q": "What is Sunway College Kathmandu?",
+    "alt": [
+      "tell me about sunway",
+      "sunway college k ho",
+      "about the college"
+    ],
+    "a": "Sunway College Kathmandu is a private college in Kathmandu established in 2007. Sunway College Kathmandu is a leading private college in Nepal offering internationally-partnered undergraduate programs in Computer Science, Business Information Technology and Business Administration.",
+    "tags": [
+      "about",
+      "sunway"
+    ],
+    "visual": "SHOW_ABOUT"
+  },
+  {
+    "q": "Where is Sunway College located?",
+    "alt": [
+      "sunway kaha cha",
+      "college address",
+      "how do I reach the campus",
+      "location",
+      "कहाँ छ",
+      "कहाँ पर्छ",
+      "कहाँ है",
+      "ठेगाना"
+    ],
+    "a": "Sunway College Kathmandu is at Behind Maitidevi Temple, Maitidevi, Kathmandu, Nepal — Behind Maitidevi Temple.",
+    "tags": [
+      "location",
+      "campus"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "What are your office hours?",
+    "alt": [
+      "kaile khulcha",
+      "office time",
+      "when is the college open"
+    ],
+    "a": "Our office is open Sunday–Friday: 9:00 AM – 5:00 PM.",
+    "tags": [
+      "contact",
+      "timing"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "How can I contact Sunway College?",
+    "alt": [
+      "phone number",
+      "contact number",
+      "email address",
+      "sunway ko number",
+      "सम्पर्क नम्बर",
+      "फोन नम्बर के हो",
+      "संपर्क नंबर क्या है"
+    ],
+    "a": "You can call 01-4531725 / 01-4523736 / 9823047066, email info@sunway.edu.np, or write to admissions at admission@sunway.edu.np.",
+    "tags": [
+      "contact"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "Which university are your degrees from?",
+    "alt": [
+      "bcu",
+      "birmingham city university",
+      "kun university ko affiliation",
+      "is it a UK degree"
+    ],
+    "a": "Sunway College Kathmandu works in academic partnership with Birmingham City University, UK. Sunway is NOT Birmingham City University — it is an academic partner college that delivers BCU-validated programs in Nepal.",
+    "tags": [
+      "bcu",
+      "university"
+    ],
+    "visual": "SHOW_UNIVERSITY_PARTNER"
+  },
+  {
+    "q": "Why should I choose Sunway College?",
+    "alt": [
+      "kina sunway",
+      "why sunway",
+      "what makes sunway different"
+    ],
+    "a": "Sunway offers BCU-validated UK degrees delivered in Kathmandu, with 60+ industry partners, an alumni network of 1200+, and dedicated academic advising.",
+    "tags": [
+      "why",
+      "about"
+    ],
+    "visual": "SHOW_WHY_SUNWAY"
+  },
+  {
+    "q": "Can I visit or tour the campus?",
+    "alt": [
+      "campus ghumna milcha",
+      "virtual tour",
+      "360 tour",
+      "can I see the college",
+      "campus visit",
+      "क्याम्पस घुम्न पाइन्छ",
+      "कलेज हेर्न पाइन्छ"
+    ],
+    "a": "Yes. You can take the 360° virtual campus tour online, or visit us in person during office hours.",
+    "tags": [
+      "campus",
+      "tour"
+    ],
+    "visual": "SHOW_360",
+    "resourceId": "campus-tour"
+  },
+  {
+    "q": "What programs do you offer?",
+    "alt": [
+      "kun kun course cha",
+      "available courses",
+      "list of programs",
+      "what can I study",
+      "कुन कुन कार्यक्रम छन्",
+      "कौन से कोर्स हैं",
+      "के के पढ्न पाइन्छ"
+    ],
+    "a": "Sunway offers BSc (Hons) Computer Science with Artificial Intelligence (4 Years) and BSc (Hons) Business Information Technology (3 Years), both awarded by Birmingham City University, UK.",
+    "tags": [
+      "program"
+    ],
+    "visual": "SHOW_PROGRAMS_LIST"
+  },
+  {
+    "q": "Tell me about the BSc Computer Science with AI program",
+    "alt": [
+      "csai",
+      "ai course",
+      "computer science with artificial intelligence"
+    ],
+    "a": "BSc (Hons) Computer Science with Artificial Intelligence is a 4 Years programme worth 480 credits, awarded by Birmingham City University, UK. Programme coordinator: Mr. Rupak Koirala.",
+    "tags": [
+      "csai",
+      "program"
+    ],
+    "visual": "SHOW_PROGRAM",
+    "resourceId": "csai"
+  },
+  {
+    "q": "Tell me about the BIT program",
+    "alt": [
+      "bit",
+      "business information technology",
+      "business it course"
+    ],
+    "a": "BSc (Hons) Business Information Technology is a 3 Years programme awarded by Birmingham City University, UK.",
+    "tags": [
+      "bit",
+      "program"
+    ],
+    "visual": "SHOW_PROGRAM",
+    "resourceId": "bit"
+  },
+  {
+    "q": "How long is the course?",
+    "alt": [
+      "duration",
+      "kati barsa",
+      "how many years",
+      "कति वर्षको हो",
+      "कितने साल का है"
+    ],
+    "a": "CSAI runs for 4 Years and BIT runs for 3 Years.",
+    "tags": [
+      "duration",
+      "program"
+    ],
+    "visual": "SHOW_PROGRAMS_LIST"
+  },
+  {
+    "q": "What is the difference between CSAI and BIT?",
+    "alt": [
+      "csai vs bit",
+      "which course is better",
+      "konsa course lin"
+    ],
+    "a": "CSAI (4 Years) focuses on computer science and artificial intelligence — best for software, AI, machine learning and data science careers. BIT (3 Years) combines business with technology — best for business analysis, IT consulting and product roles.",
+    "tags": [
+      "compare",
+      "csai",
+      "bit"
+    ],
+    "visual": "COMPARE_PROGRAMS"
+  },
+  {
+    "q": "What subjects will I study in the first year?",
+    "alt": [
+      "modules",
+      "syllabus",
+      "first year subjects",
+      "k padhinchha"
+    ],
+    "a": "First-year modules are listed in the modules panel. Verified module data is available for Year 1; for Year 2 onwards please contact admissions for the full syllabus.",
+    "tags": [
+      "module",
+      "program"
+    ],
+    "visual": "SHOW_MODULES"
+  },
+  {
+    "q": "How much is the total fee?",
+    "alt": [
+      "fee kati ho",
+      "total cost",
+      "kitna paisa lagcha",
+      "tuition fee",
+      "कुल शुल्क कति हो",
+      "शुल्क कति हो",
+      "फीस कितनी है",
+      "कति पैसा लाग्छ",
+      "कितना पैसा लगता है"
+    ],
+    "a": "The listed grand total is NPR 1,275,000 for CSAI and NPR 1,135,000 for BIT. Listed grand total is Rs. 12,75,000 subject to exchange rate conditions, bank charges and applicable TDS.",
+    "tags": [
+      "fee"
+    ],
+    "visual": "SHOW_FEE_STRUCTURE"
+  },
+  {
+    "q": "What is the fee for CSAI?",
+    "alt": [
+      "csai fee",
+      "ai course ko fee",
+      "computer science with ai cost",
+      "सीएसएआई को शुल्क कति",
+      "सीएसएआई फीस"
+    ],
+    "a": "BSc (Hons) Computer Science with Artificial Intelligence has a listed grand total of NPR 1,275,000, broken down as Year 1: NPR 545,000, Year 2: NPR 355,000, Year 3: NPR 67,500, Year 4: NPR 307,500.",
+    "tags": [
+      "fee",
+      "csai"
+    ],
+    "visual": "SHOW_FEE_STRUCTURE",
+    "resourceId": "csai"
+  },
+  {
+    "q": "What is the fee for BIT?",
+    "alt": [
+      "bit fee",
+      "bit ko fee kati",
+      "business information technology cost",
+      "बीआईटी को शुल्क कति",
+      "बीआईटी फीस"
+    ],
+    "a": "BSc (Hons) Business Information Technology has a listed grand total of NPR 1,135,000, broken down as Year 1: NPR 505,000, Year 2: NPR 315,000, Year 3: NPR 315,000.",
+    "tags": [
+      "fee",
+      "bit"
+    ],
+    "visual": "SHOW_FEE_STRUCTURE",
+    "resourceId": "bit"
+  },
+  {
+    "q": "Do I have to pay the whole fee at admission?",
+    "alt": [
+      "when do I pay",
+      "payment schedule",
+      "kaile tirne",
+      "installment",
+      "can I pay in parts"
+    ],
+    "a": "No — not all fees are due at admission. Admission Fee & BCU EPT (if applicable): At time of admission; Security Deposit: At time of admission; University Fee: At time of admission each year; ECA/CCA Fee: Within first week of class start; Semester Fee: Within third week of class start; Annual Fee: Within fifth week of class start.",
+    "tags": [
+      "fee",
+      "payment"
+    ],
+    "visual": "SHOW_FEE_SCHEDULE"
+  },
+  {
+    "q": "Is there any scholarship available?",
+    "alt": [
+      "scholarship milcha",
+      "discount",
+      "fee waiver",
+      "financial aid",
+      "छात्रवृत्ति पाइन्छ",
+      "छात्रवृत्ति मिलती है",
+      "छात्रवृत्ति छ"
+    ],
+    "a": "Sunway offers Merit-Based Scholarship and Sports Scholarship. Scholarship is applicable to the college fee of the first semester. Continuation may occur according to Sunway's scholarship policy. For current scholarship amounts and eligibility, please contact the admissions office — do not rely on third-party or outdated sources.",
+    "tags": [
+      "scholarship",
+      "fee"
+    ],
+    "visual": "SHOW_SCHOLARSHIP"
+  },
+  {
+    "q": "How do I apply for admission?",
+    "alt": [
+      "admission kasari garne",
+      "how to join",
+      "application process",
+      "apply kaise kare",
+      "भर्ना कसरी गर्ने",
+      "प्रवेश कैसे लें",
+      "भर्ना प्रक्रिया",
+      "आवेदन कसरी दिने"
+    ],
+    "a": "1. Visit Sunway College or fill the online application form. 2. Submit required documents for verification. 3. Complete fee payment to confirm your admission. 4. Receive admission confirmation and class schedule. You can also apply online at https://sunway.edu.np/apply.",
+    "tags": [
+      "admission"
+    ],
+    "visual": "SHOW_ADMISSION"
+  },
+  {
+    "q": "What documents are required for admission?",
+    "alt": [
+      "documents chahiyo",
+      "kya kya document lagcha",
+      "paperwork needed",
+      "checklist",
+      "कुन कुन कागजात चाहिन्छ",
+      "कौन से दस्तावेज चाहिए",
+      "कागजात के के चाहिन्छ"
+    ],
+    "a": "You will need: Grade 10 Marksheet, Grade 10 Completion Certificate, Grade 10 Character Certificate, Grade 11 Marksheet, Grade 12 Marksheet, Grade 12 Provisional Certificate, Grade 12 Migration Certificate, Grade 12 Character Certificate, Citizenship Certificate OR Passport, English Proficiency Test Marksheet, Recommendation Letter from previous school, 1 Passport Size Photo.",
+    "tags": [
+      "document",
+      "admission"
+    ],
+    "visual": "SHOW_ADMISSION_DOCUMENTS"
+  },
+  {
+    "q": "What is the eligibility criteria?",
+    "alt": [
+      "am I eligible",
+      "minimum cgpa",
+      "qualification chahiyo",
+      "entry requirements",
+      "योग्यता के चाहिन्छ",
+      "योग्यता क्या है",
+      "कति जीपीए चाहिन्छ"
+    ],
+    "a": "For CSAI: NEB Grade 12 or equivalent, with a minimum aggregate CGPA of 2.6. English requirements depend on your Grade 12 English grade — Grade A+ needs no test, Grade B/B+ requires the BCU English Proficiency Test, and below B requires a BCU-recognised proficiency qualification.",
+    "tags": [
+      "eligibility",
+      "admission"
+    ],
+    "visual": "SHOW_ADMISSION"
+  },
+  {
+    "q": "Do I need IELTS?",
+    "alt": [
+      "ielts chahiyo",
+      "english test",
+      "english proficiency requirement",
+      "toefl"
+    ],
+    "a": "You do not necessarily need IELTS. If your Grade 12 English grade is A+, no English test is required. For Grade B/B+ you take the BCU English Proficiency Test (approximately NPR 15,000). Below Grade B, a BCU-recognised English proficiency qualification is required.",
+    "tags": [
+      "eligibility",
+      "english",
+      "admission"
+    ],
+    "visual": "SHOW_ADMISSION"
+  },
+  {
+    "q": "What jobs can I get after this degree?",
+    "alt": [
+      "career options",
+      "job scope",
+      "k banna sakinchha",
+      "placement",
+      "के काम पाइन्छ",
+      "कौन सी नौकरी मिलेगी"
+    ],
+    "a": "CSAI graduates go into roles such as Software Developer, Software Engineer, Web Developer, Computer Programmer, Java Developer, Python Programmer. BIT graduates go into roles such as Business Analyst, Consultant, IT Product Owner, Solution Developer.",
+    "tags": [
+      "career"
+    ],
+    "visual": "SHOW_CAREERS"
+  },
+  {
+    "q": "Do you help with job placement?",
+    "alt": [
+      "placement rate",
+      "will I get a job",
+      "career support",
+      "internship"
+    ],
+    "a": "Sunway reports a 95% placement rate with 60+ industry partners and an alumni network of 1200+. 95% placement rate and partner statistics are from Sunway's latest prospectus. These represent placement support outcomes and industry connections — they do not constitute a guarantee of individual employment.",
+    "tags": [
+      "career",
+      "placement"
+    ],
+    "visual": "SHOW_PLACEMENT"
+  },
+  {
+    "q": "What is RAIN?",
+    "alt": [
+      "incubation center",
+      "startup support",
+      "research center"
+    ],
+    "a": "Sunway Research and Incubation Center — RAIN is Sunway College's dedicated research and incubation center that helps students and entrepreneurs turn ideas into real businesses through a structured support framework.",
+    "tags": [
+      "rain",
+      "facility"
+    ],
+    "visual": "SHOW_RAIN"
+  },
+  {
+    "q": "What facilities does the college have?",
+    "alt": [
+      "innovation lab",
+      "facilities",
+      "labs",
+      "campus facilities"
+    ],
+    "a": "Sunway Innovation Lab: Sunway's Innovation Lab is a modern facility for hands-on technology exploration and project development. The prospectus showcases practical technology projects developed by students.",
+    "tags": [
+      "facility"
+    ],
+    "visual": "SHOW_INNOVATION_LAB"
+  },
+  {
+    "q": "What clubs and activities are there?",
+    "alt": [
+      "student life",
+      "extracurricular",
+      "ssrc",
+      "clubs"
+    ],
+    "a": "Sunway has student clubs including Multimedia Club, Literary Club, Sports Club, Entrepreneurship & AI Club, Creativity Club, Social Club, plus the Sunway Student Representative Council (SSRC).",
+    "tags": [
+      "student life",
+      "clubs"
+    ],
+    "visual": "SHOW_STUDENT_LIFE"
+  },
+  {
+    "q": "Is there academic support for students?",
+    "alt": [
+      "academic advisor",
+      "mentor",
+      "who will help me study"
+    ],
+    "a": "Academic Advisory Unit: Personalized academic support helping students navigate their education, align coursework with career goals and address challenges early. Faculty allocate 2 hours per week for student advising.",
+    "tags": [
+      "advisory",
+      "support"
+    ],
+    "visual": "SHOW_ACADEMIC_ADVISORY"
+  },
+  {
+    "q": "Do you provide hostel or accommodation?",
+    "alt": [
+      "hostel cha",
+      "accommodation",
+      "where will I stay",
+      "residence"
+    ],
+    "a": "I don't have verified information about accommodation. Please contact the admissions office on 01-4531725 / 01-4523736 / 9823047066 to ask about hostel options.",
+    "tags": [
+      "hostel"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "Is transportation or a college bus available?",
+    "alt": [
+      "bus service",
+      "transport",
+      "pickup"
+    ],
+    "a": "I don't have verified information about transport or bus service. Please contact the admissions office on 01-4531725 / 01-4523736 / 9823047066 to ask.",
+    "tags": [
+      "transport"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "When does the next intake or admission open?",
+    "alt": [
+      "intake date",
+      "admission kaile khulcha",
+      "application deadline",
+      "when do classes start"
+    ],
+    "a": "Intake dates change each year. Please call 01-4531725 / 01-4523736 / 9823047066 or email admission@sunway.edu.np for the current admission dates and deadlines.",
+    "tags": [
+      "admission",
+      "timing"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "What are the class timings?",
+    "alt": [
+      "class time",
+      "shift",
+      "morning or day classes"
+    ],
+    "a": "I don't have verified information about class timings. Please contact the admissions office on 01-4531725 / 01-4523736 / 9823047066 to confirm.",
+    "tags": [
+      "timing"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "Is there an entrance exam?",
+    "alt": [
+      "entrance test",
+      "admission test",
+      "exam dinu parcha"
+    ],
+    "a": "I don't have verified information about an entrance exam. Please contact the admissions office on 01-4531725 / 01-4523736 / 9823047066 to confirm the selection process.",
+    "tags": [
+      "admission",
+      "eligibility"
+    ],
+    "visual": "SHOW_CONTACT"
+  },
+  {
+    "q": "Who built you?",
+    "alt": [
+      "who made this",
+      "kasle banayo",
+      "who created this assistant",
+      "pranam software"
+    ],
+    "a": "I was built by Pranam Software, a Nepal-based AI and software company.",
+    "tags": [
+      "about"
+    ]
+  },
+  {
+    "q": "Who is the Principal Of the Sunway college",
+    "a": "Khusal Regmi is the Principal of this college.",
+    "alt": [
+      "principal?",
+      "Principal ko ho?",
+      "Principal ko name k ho?",
+      "Principal Kon he?",
+      "Head kon he?",
+      "Who is head?",
+      "Head ko ho?",
+      "leader ko ho?",
+      "Leader kon he?"
+    ],
+    "tags": []
+  },
+  {
+    "q": "who is the director of the college",
+    "a": "Khusal regmi is the director of sunway college",
+    "alt": [
+      "director",
+      "director ko ho",
+      "director ko xa"
+    ],
+    "tags": []
+  }
+]
